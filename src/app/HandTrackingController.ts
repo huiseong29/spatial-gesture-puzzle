@@ -28,6 +28,10 @@ export type RuntimeStatus = {
 
 export type ExperienceState = {
   puzzleMode: string | null;
+  puzzleTransitionPhase: string | null;
+  boxMode: string | null;
+  capturePhase: string | null;
+  captureReady: boolean;
   heatmapReplayMode: "hidden" | "ready" | "playing" | "finished";
   pointerHistoryCount: number;
 };
@@ -345,10 +349,22 @@ export class HandTrackingController {
     const puzzle = frame?.puzzle ?? null;
     const state: ExperienceState = {
       puzzleMode: puzzle?.mode ?? null,
+      puzzleTransitionPhase: puzzle?.transition?.phase ?? null,
+      boxMode: frame?.virtualBoundingBox?.mode ?? null,
+      capturePhase: frame?.capture?.phase ?? null,
+      captureReady: frame?.capture?.captureReady ?? false,
       heatmapReplayMode: puzzle?.interaction.heatmapReplayMode ?? "hidden",
       pointerHistoryCount: puzzle?.interaction.pointerHistory.samples.length ?? 0
     };
-    const key = `${state.puzzleMode}:${state.heatmapReplayMode}:${state.pointerHistoryCount > 0 ? "has-history" : "empty"}`;
+    const key = [
+      state.puzzleMode,
+      state.puzzleTransitionPhase,
+      state.boxMode,
+      state.capturePhase,
+      state.captureReady ? "capture-ready" : "capture-idle",
+      state.heatmapReplayMode,
+      state.pointerHistoryCount > 0 ? "has-history" : "empty"
+    ].join(":");
 
     if (key === this.lastExperienceStateKey) {
       return;

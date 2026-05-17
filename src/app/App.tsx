@@ -1,69 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { HandTrackingController, type ExperienceState, type RuntimeStatus } from "./HandTrackingController";
+import { getInteractionInstruction } from "./instructionText";
 import type { ThemeMode } from "../theme/themeTypes";
-
-function modeToKoreanInstruction(status: RuntimeStatus) {
-  if (status.phase === "idle") {
-    return "카메라를 시작하세요";
-  }
-
-  if (status.phase === "camera-permission") {
-    return "카메라 권한을 요청하는 중입니다";
-  }
-
-  if (status.phase === "camera-ready") {
-    return "양손 pinch로 캡처 영역을 지정하세요";
-  }
-
-  if (status.phase === "model-loading") {
-    return "Hand Landmarker 모델을 로딩 중입니다";
-  }
-
-  if (status.phase === "running") {
-    if (status.message === "Puzzle restarted") {
-      return "퍼즐을 다시 섞었습니다";
-    }
-
-    if (status.message === "Ready for new capture") {
-      return "새 캡처 영역을 지정하세요";
-    }
-
-    return "pinch gesture로 퍼즐 조각을 이동하세요";
-  }
-
-  if (status.phase === "stopped") {
-    return "카메라가 정지되었습니다. 다시 시작할 수 있습니다";
-  }
-
-  if (status.phase === "error") {
-    return "카메라 접근 권한을 확인하세요";
-  }
-
-  return "시스템을 준비 중입니다";
-}
-
-function modeToStatusLabel(status: RuntimeStatus) {
-  if (status.phase === "running") {
-    return "RUNNING";
-  }
-
-  if (status.phase === "error") {
-    return "ERROR";
-  }
-
-  if (status.phase === "stopped") {
-    return "STOPPED";
-  }
-
-  if (status.phase === "camera-permission" || status.phase === "model-loading") {
-    return "LOADING";
-  }
-
-  return "READY";
-}
 
 type UnifiedTopBarProps = {
   status: RuntimeStatus;
+  experienceState: ExperienceState;
   debugEnabled: boolean;
   themeMode: ThemeMode;
   onStart: () => void;
@@ -73,12 +15,15 @@ type UnifiedTopBarProps = {
 
 function UnifiedTopBar({
   status,
+  experienceState,
   debugEnabled,
   themeMode,
   onStart,
   onToggleDebug,
   onToggleTheme
 }: UnifiedTopBarProps) {
+  const instruction = getInteractionInstruction(status, experienceState);
+
   return (
     <header className="top-bar">
       <div className="brand-block">
@@ -87,8 +32,8 @@ function UnifiedTopBar({
       </div>
 
       <div className="top-guide" aria-live="polite">
-        <span className={`mode-pill mode-${status.phase}`}>{modeToStatusLabel(status)}</span>
-        <p>{modeToKoreanInstruction(status)}</p>
+        <h2>{instruction.title}</h2>
+        <p>{instruction.instruction}</p>
       </div>
 
       <div className="top-actions" aria-label="상단 액션">
@@ -123,6 +68,10 @@ function UnifiedTopBar({
 function createInitialExperienceState(): ExperienceState {
   return {
     puzzleMode: null,
+    puzzleTransitionPhase: null,
+    boxMode: null,
+    capturePhase: null,
+    captureReady: false,
     heatmapReplayMode: "hidden",
     pointerHistoryCount: 0
   };
@@ -220,6 +169,7 @@ export function App() {
         <div className="ui-layer">
           <UnifiedTopBar
             status={status}
+            experienceState={experienceState}
             debugEnabled={debugEnabled}
             themeMode={themeMode}
             onStart={startCamera}
@@ -234,7 +184,7 @@ export function App() {
                   CV
                 </span>
                 <h1>Hand Gesture Interaction Demo</h1>
-                <p>{modeToKoreanInstruction(status)}</p>
+                <p>{getInteractionInstruction(status, experienceState).instruction}</p>
                 <button
                   type="button"
                   onClick={startCamera}
