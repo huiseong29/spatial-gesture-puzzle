@@ -113,6 +113,7 @@ button {
   object-fit: cover;
   background: #050816;
   background: var(--bg-deep);
+  pointer-events: none;
 }
 
 .ui-layer {

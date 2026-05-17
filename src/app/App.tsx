@@ -31,6 +31,10 @@ function modeToKoreanInstruction(status: RuntimeStatus) {
     return "pinch gesture로 퍼즐 조각을 이동하세요";
   }
 
+  if (status.phase === "stopped") {
+    return "카메라가 정지되었습니다. 다시 시작할 수 있습니다";
+  }
+
   if (status.phase === "error") {
     return "카메라 접근 권한을 확인하세요";
   }
@@ -45,6 +49,10 @@ function modeToStatusLabel(status: RuntimeStatus) {
 
   if (status.phase === "error") {
     return "ERROR";
+  }
+
+  if (status.phase === "stopped") {
+    return "STOPPED";
   }
 
   if (status.phase === "camera-permission" || status.phase === "model-loading") {
@@ -88,7 +96,12 @@ function UnifiedTopBar({
           type="button"
           className="compact-action"
           onClick={onStart}
-          disabled={status.phase === "running" || status.phase === "camera-permission"}
+          disabled={
+            status.phase === "running" ||
+            status.phase === "camera-permission" ||
+            status.phase === "model-loading" ||
+            status.phase === "booting"
+          }
         >
           손 인식
         </button>
@@ -222,7 +235,15 @@ export function App() {
                 </span>
                 <h1>Hand Gesture Interaction Demo</h1>
                 <p>{modeToKoreanInstruction(status)}</p>
-                <button type="button" onClick={startCamera} disabled={status.phase === "camera-permission"}>
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  disabled={
+                    status.phase === "camera-permission" ||
+                    status.phase === "model-loading" ||
+                    status.phase === "booting"
+                  }
+                >
                   카메라 시작
                 </button>
               </div>

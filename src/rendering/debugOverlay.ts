@@ -1,13 +1,11 @@
-import type { TrackedHand } from "../tracking/handTypes";
+import type { CaptureState } from "../capture/snapshotTypes";
 import type { PinchGestureState } from "../interaction/gestures/pinchTypes";
 import type { VirtualBoundingBox } from "../interaction/boundingBox/boundingBoxTypes";
-import type { CaptureState } from "../capture/snapshotTypes";
-import type { PuzzleBoard } from "../puzzle/puzzleTypes";
 import { getLockedPieceCount } from "../puzzle/puzzleCompletion";
-import type { FrameProfile } from "../tracking/handTypes";
-import type { InteractionConfidenceState } from "../tracking/handTypes";
-import type { ThemeMode } from "../theme/themeTypes";
+import type { PuzzleBoard } from "../puzzle/puzzleTypes";
+import type { FrameProfile, InteractionConfidenceState, TrackedHand } from "../tracking/handTypes";
 import { getThemeTokens } from "../theme/themeTokens";
+import type { ThemeMode } from "../theme/themeTypes";
 
 export type DebugOverlayOptions = {
   fps: number;
@@ -21,167 +19,176 @@ export type DebugOverlayOptions = {
   interactionConfidence: InteractionConfidenceState | null;
 };
 
+type DebugLine = {
+  text: string;
+  kind?: "section" | "muted";
+};
+
 export function renderDebugOverlay(
   context: CanvasRenderingContext2D,
   options: DebugOverlayOptions,
   themeMode: ThemeMode = "dark"
 ) {
-  const box = options.virtualBoundingBox;
-  const boxLines = options.virtualBoundingBox
-    ? [
-        `Box ${box!.active ? "active" : "inactive"} ${box!.mode} lost ${box!.lostFrameCount}`,
-        `  A ${formatPoint(box!.cornerA)} B ${formatPoint(box!.cornerB)}`,
-        `  raw ${Math.round(box!.rawRect.width)} x ${Math.round(box!.rawRect.height)}`,
-        `  smooth ${Math.round(box!.smoothedRect.width)} x ${Math.round(box!.smoothedRect.height)}`,
-        `  center ${Math.round(box!.center.x)}, ${Math.round(box!.center.y)}`,
-        `  corner dist ${Math.round(box!.cornerDistancePx)}`
-      ]
-    : ["Box inactive"];
-
-  const lines = [
-    `FPS ${options.fps}`,
-    ...formatProfileLines(options.profile),
-    ...formatRipenessLines(options.interactionConfidence),
-    `Hands ${options.handCount}/2`,
-    ...boxLines,
-    ...formatCaptureLines(options.capture),
-    ...formatPuzzleLines(options.puzzle, options.pinchGestures),
-    ...options.hands.flatMap((hand) => {
-      const pinch = options.pinchGestures.get(hand.id);
-
-      if (!pinch) {
-        return [
-          `${hand.id} ${hand.handedness} ${hand.trackingState} no-gesture`,
-          `  quality ${Math.round(hand.trackingQuality * 100)} stable ${hand.stableFrameCount} lost ${hand.lostFrameCount}`,
-          `  jump ${Math.round(hand.jumpDistancePx)} reject ${hand.rejectedReason ?? "-"}`
-        ];
-      }
-
-      return [
-        `${hand.id} ${hand.handedness} ${hand.trackingState} ${pinch.phase}`,
-        `  quality ${Math.round(hand.trackingQuality * 100)} stable ${hand.stableFrameCount} lost ${hand.lostFrameCount}`,
-        `  jump ${Math.round(hand.jumpDistancePx)} reject ${hand.rejectedReason ?? "-"}`,
-        `  dist ${pinch.normalizedDistance.toFixed(2)} px ${Math.round(pinch.pinchDistancePx)}`,
-        `  start ${pinch.startThreshold.toFixed(2)} release ${pinch.releaseThreshold.toFixed(2)}`
-      ];
-    })
-  ];
+  const lines = buildDebugLines(options);
+  const theme = getThemeTokens(themeMode);
+  const fontSize = 10;
+  const lineHeight = 12;
+  const paddingX = 8;
+  const paddingY = 7;
+  const safeRight = 14;
+  const safeBottom = 86;
+  const maxPanelWidth = 300;
+  const maxPanelHeight = Math.max(96, Math.min(168, context.canvas.height - 132));
+  const maxVisibleLines = Math.max(5, Math.floor((maxPanelHeight - paddingY * 2) / lineHeight));
+  const visibleLines = lines.length > maxVisibleLines
+    ? [...lines.slice(0, maxVisibleLines - 1), { text: `+${lines.length - maxVisibleLines + 1} more`, kind: "muted" as const }]
+    : lines;
 
   context.save();
-  const theme = getThemeTokens(themeMode);
-  context.font = "600 16px Inter, system-ui, sans-serif";
+  context.font = `600 ${fontSize}px "JetBrains Mono", "SFMono-Regular", Consolas, monospace`;
   context.textBaseline = "top";
 
-  const width = Math.max(...lines.map((line) => context.measureText(line).width)) + 28;
-  const height = lines.length * 24 + 20;
+  const measuredWidth = Math.max(...visibleLines.map((line) => context.measureText(line.text).width));
+  const width = Math.min(maxPanelWidth, Math.ceil(measuredWidth + paddingX * 2));
+  const height = Math.min(maxPanelHeight, visibleLines.length * lineHeight + paddingY * 2);
+  const x = Math.max(12, context.canvas.width - width - safeRight);
+  const y = Math.max(12, context.canvas.height - height - safeBottom);
 
-  context.fillStyle = themeMode === "light" ? "rgba(255, 255, 255, 0.86)" : "rgba(2, 6, 23, 0.72)";
-  context.fillRect(16, 16, width, height);
-  context.fillStyle = themeMode === "light" ? theme.textPrimary : "rgba(241, 245, 249, 0.96)";
+  context.fillStyle = themeMode === "light" ? "rgba(255, 255, 255, 0.78)" : "rgba(8, 8, 8, 0.64)";
+  context.strokeStyle = themeMode === "light" ? "rgba(122, 90, 74, 0.16)" : "rgba(255, 237, 213, 0.12)";
+  context.lineWidth = 1;
+  roundRect(context, x, y, width, height, 8);
+  context.fill();
+  context.stroke();
 
-  lines.forEach((line, index) => {
-    context.fillText(line, 30, 28 + index * 24);
+  visibleLines.forEach((line, index) => {
+    if (line.kind === "section") {
+      context.fillStyle = theme.tomatoPrimary;
+    } else if (line.kind === "muted") {
+      context.fillStyle = theme.textSecondary;
+    } else {
+      context.fillStyle = theme.textPrimary;
+    }
+
+    context.fillText(truncate(line.text, 48), x + paddingX, y + paddingY + index * lineHeight);
   });
 
   context.restore();
 }
 
-function formatRipenessLines(confidence: InteractionConfidenceState | null) {
-  if (!confidence) {
-    return ["Ripeness -"];
-  }
-
+function buildDebugLines(options: DebugOverlayOptions): DebugLine[] {
   return [
-    `Ripeness ${Math.round(confidence.ripeness * 100)}% confidence ${confidence.gestureConfidence.toFixed(2)}`,
-    `  stableHands ${confidence.stableHands} jitter ${Math.round(confidence.jitterPx)} lag ${Math.round(confidence.lagPx)}`
+    {
+      text: `FPS ${options.fps} | detect ${ms(options.profile?.detectMs)} | render ${ms(options.profile?.renderMs)}`
+    },
+    {
+      text: `TRK hands ${options.handCount}/2 | jitter ${round(options.interactionConfidence?.jitterPx)} | lag ${round(options.interactionConfidence?.lagPx)}`
+    },
+    {
+      text: `RIPE ${percent(options.interactionConfidence?.ripeness)} | conf ${fixed(options.interactionConfidence?.gestureConfidence, 2)}`,
+      kind: "muted"
+    },
+    { text: "[BOX]", kind: "section" },
+    formatBoxLine(options.virtualBoundingBox),
+    { text: "[CAPTURE]", kind: "section" },
+    formatCaptureLine(options.capture),
+    { text: "[PUZZLE]", kind: "section" },
+    ...formatPuzzleLines(options.puzzle, options.pinchGestures)
   ];
 }
 
-function formatProfileLines(profile: FrameProfile | null) {
-  if (!profile) {
-    return ["Profile -"];
+function formatBoxLine(box: VirtualBoundingBox | null): DebugLine {
+  if (!box) {
+    return { text: "idle" };
   }
 
-  return [
-    `ms detect ${profile.detectMs.toFixed(1)} render ${profile.renderMs.toFixed(1)} total ${profile.totalMs.toFixed(1)}`,
-    `ms normalize ${profile.normalizeMs.toFixed(1)} interaction ${profile.interactionMs.toFixed(1)}`
-  ];
+  return {
+    text: `${box.mode} | lost ${box.lostFrameCount} | ${Math.round(box.smoothedRect.width)}x${Math.round(box.smoothedRect.height)}`
+  };
 }
 
-function formatPuzzleLines(puzzle: PuzzleBoard | null, pinchGestures: Map<string, PinchGestureState>) {
+function formatCaptureLine(capture: CaptureState | null): DebugLine {
+  if (!capture) {
+    return { text: "idle" };
+  }
+
+  const ready = capture.captureReady ? "ready" : "not-ready";
+  const fail = capture.failureReason === "none" ? "ok" : capture.failureReason;
+  return {
+    text: `${capture.phase} | ${ready} | ${fail}`
+  };
+}
+
+function formatPuzzleLines(
+  puzzle: PuzzleBoard | null,
+  pinchGestures: Map<string, PinchGestureState>
+): DebugLine[] {
   if (!puzzle) {
-    return ["Puzzle empty"];
+    return [{ text: "empty" }];
   }
 
   const interaction = puzzle.interaction;
+  const locked = getLockedPieceCount(puzzle.pieces);
   const activePinch = interaction.activeHandId
     ? pinchGestures.get(interaction.activeHandId)?.phase ?? "missing"
     : "-";
 
   return [
-    `Puzzle ${puzzle.mode}`,
-    `  transition ${puzzle.transition?.phase ?? "-"} ${formatTransitionProgress(puzzle)}`,
-    `  difficulty ${puzzle.difficulty.gridSize}x${puzzle.difficulty.gridSize} ${puzzle.difficulty.reason}`,
-    `  confidence ${puzzle.difficulty.gestureConfidence.toFixed(2)} jitter ${Math.round(puzzle.difficulty.trackingJitterPx)}px area ${(puzzle.difficulty.captureAreaRatio * 100).toFixed(1)}%`,
-    `  pieces ${puzzle.pieces.length}`,
-    `  lockedPieces ${getLockedPieceCount(puzzle.pieces)}/${puzzle.pieces.length}`,
-    `  pointerHistory ${puzzle.interaction.pointerHistory.samples.length}/${puzzle.interaction.pointerHistory.maxSamples}`,
-    `  replay ${puzzle.interaction.heatmapReplayMode}`,
-    `  board ${Math.round(puzzle.boardRect.width)} x ${Math.round(puzzle.boardRect.height)}`,
-    `  completed ${interaction.completed ? "yes" : "no"}`,
-    `  dragPhase ${interaction.dragPhase}`,
-    `  selected ${interaction.selectedPieceId ?? "-"} activeHand ${interaction.activeHandId ?? "-"}`,
-    `  hover ${interaction.hoveredPieceId ?? "-"}`,
-    `  grabWindow ${interaction.grabWindowFrames} nearestCell ${interaction.nearestCellIndex ?? "-"}`,
-    `  snapPreview ${interaction.snapPreview?.cellIndex ?? "-"} correct ${interaction.snapPreview?.isCorrect ? "yes" : "no"}`,
-    `  pointerLost ${interaction.pointerLostFrames} releaseGrace ${interaction.releaseGraceFrames}`,
-    `  pinchPhase ${activePinch}`,
-    `  pointer ${formatPoint(interaction.pointer)}`,
-    `  raw ${formatPoint(interaction.rawPointer)} smooth ${formatPoint(interaction.smoothedPointer)}`,
-    `  velocity ${Math.round(interaction.pointerVelocityPxPerSec)} alpha ${interaction.pointerSmoothingAlpha.toFixed(2)}`,
-    `  lag ${Math.round(interaction.pointerLagPx)}px`,
-    `  snap ${interaction.lastSnapPieceId ?? "-"} dist ${interaction.snapDistancePx === null ? "-" : Math.round(interaction.snapDistancePx)}`,
-    `  previewDist ${interaction.snapPreview ? Math.round(interaction.snapPreview.distancePx) : "-"} strength ${interaction.snapPreview ? interaction.snapPreview.strength.toFixed(2) : "-"}`,
-    `  locked ${getLockedPieceCount(puzzle.pieces)}/${puzzle.pieces.length}`
+    {
+      text: `${puzzle.mode} | ${puzzle.difficulty.gridSize}x${puzzle.difficulty.gridSize} | locked ${locked}/${puzzle.pieces.length}`
+    },
+    {
+      text: `drag ${interaction.dragPhase} | sel ${shortId(interaction.selectedPieceId)} | pinch ${activePinch}`,
+      kind: "muted"
+    },
+    {
+      text: `snap ${interaction.nearestCellIndex ?? "-"} | dist ${round(interaction.snapDistancePx)} | replay ${interaction.heatmapReplayMode}`,
+      kind: "muted"
+    }
   ];
 }
 
-function formatTransitionProgress(puzzle: PuzzleBoard) {
-  if (!puzzle.transition) {
-    return "-";
-  }
-
-  const duration = puzzle.transition.completedAt - puzzle.transition.startedAt;
-  const progress = Math.min(Math.max((performance.now() - puzzle.transition.startedAt) / duration, 0), 1);
-  return `${Math.round(progress * 100)}%`;
+function ms(value: number | undefined) {
+  return value === undefined ? "-" : `${Math.round(value)}ms`;
 }
 
-function formatCaptureLines(capture: CaptureState | null) {
-  if (!capture) {
-    return ["Capture idle"];
-  }
-
-  const snapshot = capture.latestSnapshot;
-  return [
-    `Capture ${capture.phase} ready ${capture.captureReady ? "yes" : "no"}`,
-    `  trigger ${capture.lastTrigger}`,
-    `  fail ${capture.failureReason}`,
-    `  readyUntil ${capture.readyUntil ? Math.round(capture.readyUntil) : "-"}`,
-    `  simDelta ${capture.simultaneousDeltaMs === null ? "-" : Math.round(capture.simultaneousDeltaMs)}`,
-    `  lockedUntil ${capture.lockedUntil ? Math.round(capture.lockedUntil) : "-"}`,
-    snapshot ? `  snapshot ${snapshot.width} x ${snapshot.height}` : "  snapshot none",
-    snapshot
-      ? `  video crop ${Math.round(snapshot.cropRectVideo.x)},${Math.round(
-          snapshot.cropRectVideo.y
-        )} ${Math.round(snapshot.cropRectVideo.width)}x${Math.round(snapshot.cropRectVideo.height)}`
-      : "  video crop -"
-  ];
+function round(value: number | null | undefined) {
+  return value === null || value === undefined ? "-" : `${Math.round(value)}`;
 }
 
-function formatPoint(point: { x: number; y: number } | null) {
-  if (!point) {
-    return "-";
-  }
+function fixed(value: number | null | undefined, digits: number) {
+  return value === null || value === undefined ? "-" : value.toFixed(digits);
+}
 
-  return `${Math.round(point.x)},${Math.round(point.y)}`;
+function percent(value: number | null | undefined) {
+  return value === null || value === undefined ? "-" : `${Math.round(value * 100)}%`;
+}
+
+function shortId(value: string | null) {
+  return value ? value.replace("piece-", "p") : "-";
+}
+
+function truncate(value: string, maxLength: number) {
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
+}
+
+function roundRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+) {
+  const r = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.lineTo(x + width - r, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + r);
+  context.lineTo(x + width, y + height - r);
+  context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  context.lineTo(x + r, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - r);
+  context.lineTo(x, y + r);
+  context.quadraticCurveTo(x, y, x + r, y);
 }

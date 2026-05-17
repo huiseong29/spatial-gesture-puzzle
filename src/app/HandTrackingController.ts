@@ -18,6 +18,7 @@ export type RuntimePhase =
   | "camera-ready"
   | "model-loading"
   | "running"
+  | "stopped"
   | "error";
 
 export type RuntimeStatus = {
@@ -59,6 +60,7 @@ export class HandTrackingController {
   private fpsFrameCount = 0;
   private fps = 0;
   private starting = false;
+  private startToken = 0;
 
   constructor(options: HandTrackingControllerOptions) {
     this.video = options.video;
@@ -69,51 +71,76 @@ export class HandTrackingController {
   }
 
   async start() {
-    if (this.starting || this.handLandmarker) {
+    if (this.starting || (this.handLandmarker && !this.stopped)) {
       return;
     }
 
     this.starting = true;
     this.stopped = false;
+    const startToken = ++this.startToken;
+    cancelAnimationFrame(this.animationFrameId);
+    this.animationFrameId = 0;
+    this.resetInteractionRuntime();
 
     try {
       this.setStatus("camera-permission", "Waiting for webcam permission");
       this.stream = await createCameraStream();
+      if (!this.isCurrentStart(startToken)) {
+        this.stopTrackingResources();
+        return;
+      }
       this.video.srcObject = this.stream;
       await this.video.play();
+      if (!this.isCurrentStart(startToken)) {
+        this.stopTrackingResources();
+        return;
+      }
 
       this.setStatus("camera-ready", "Webcam stream ready");
       this.setStatus("model-loading", "Loading MediaPipe hand landmarker");
-      this.handLandmarker = await createHandLandmarker();
+      const handLandmarker = await createHandLandmarker();
+      if (!this.isCurrentStart(startToken)) {
+        handLandmarker.close();
+        this.stopTrackingResources();
+        return;
+      }
+      this.handLandmarker = handLandmarker;
 
       this.setStatus("running", "Tracking hands");
       this.loop();
     } catch (error) {
+      this.stopTrackingResources();
       this.setStatus("error", formatStartupError(error));
-      this.stop();
     } finally {
       this.starting = false;
     }
   }
 
   stop() {
+    this.stopTrackingResources();
+    this.setStatus("stopped", "Camera stopped");
+  }
+
+  private stopTrackingResources() {
+    this.startToken += 1;
     this.stopped = true;
+    this.starting = false;
     cancelAnimationFrame(this.animationFrameId);
+    this.animationFrameId = 0;
     this.handLandmarker?.close();
     this.handLandmarker = null;
     stopCameraStream(this.stream);
     this.stream = null;
+    this.video.pause();
     this.video.srcObject = null;
-    this.lastFrame = null;
-    this.lastVideoTime = -1;
-    this.pinchDetector.reset();
-    this.virtualBoundingBoxTracker.reset();
-    this.snapshotCaptureManager.reset();
-    this.puzzleBoardManager.reset();
-    this.publishExperienceState(null);
+    this.resetInteractionRuntime();
   }
 
   restartPuzzle() {
+    if (this.stopped || !this.handLandmarker) {
+      return;
+    }
+
     this.puzzleBoardManager.restart(this.canvas.width, this.canvas.height);
     this.lastFrame = this.lastFrame
       ? {
@@ -125,6 +152,10 @@ export class HandTrackingController {
   }
 
   retakeSnapshot() {
+    if (this.stopped || !this.handLandmarker) {
+      return;
+    }
+
     this.snapshotCaptureManager.clearSnapshot();
     this.puzzleBoardManager.clearAll();
     this.virtualBoundingBoxTracker.reset();
@@ -141,6 +172,10 @@ export class HandTrackingController {
   }
 
   startInteractionReplay() {
+    if (this.stopped || !this.handLandmarker) {
+      return;
+    }
+
     this.puzzleBoardManager.startHeatmapReplay();
     this.publishExperienceState(this.lastFrame);
   }
@@ -279,6 +314,23 @@ export class HandTrackingController {
       this.fpsFrameCount = 0;
       this.fpsLastTime = now;
     }
+  }
+
+  private resetInteractionRuntime() {
+    this.lastFrame = null;
+    this.lastVideoTime = -1;
+    this.fps = 0;
+    this.fpsFrameCount = 0;
+    this.fpsLastTime = performance.now();
+    this.pinchDetector.reset();
+    this.virtualBoundingBoxTracker.reset();
+    this.snapshotCaptureManager.reset();
+    this.puzzleBoardManager.reset();
+    this.publishExperienceState(null);
+  }
+
+  private isCurrentStart(startToken: number) {
+    return !this.stopped && this.startToken === startToken;
   }
 
   private setStatus(phase: RuntimePhase, message: string) {
