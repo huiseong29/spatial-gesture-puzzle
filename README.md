@@ -51,69 +51,28 @@
 
 ## ✨ Interaction Highlights
 
-### 🍃 Realtime Hand Tracking
+| Feature | What it feels like | Implementation focus |
+| --- | --- | --- |
+| 🍃 **Hand Tracking** | 손 skeleton이 실시간으로 화면 위에 따라옵니다 | MediaPipe Hands, 21 landmarks, confidence filtering |
+| 🤏 **Pinch Gesture** | 엄지와 검지를 모아 잡고, 떼면 놓습니다 | normalized distance, hysteresis, frame debounce |
+| 🍅 **Capture Box** | 양손으로 캡처할 네모 영역을 직접 만듭니다 | two pinch points, free-form rectangle, smoothed/confirmed rect |
+| 📸 **Snapshot Crop** | 선택한 영역이 그대로 이미지로 고정됩니다 | source video crop, mirror correction, cooldown lock |
+| 🧩 **Adaptive Puzzle** | 캡처 크기와 안정성에 맞춰 퍼즐 난이도가 바뀝니다 | dynamic 2x2/3x3/4x4, derangement shuffle |
+| ✨ **Puzzle Control** | 손으로 조각을 집고, 가까운 칸에 자연스럽게 놓습니다 | forgiving hit test, active hand lock, magnetic snap |
+| 🔎 **Replay Analysis** | 완성 후 손동작이 집중된 위치와 이동 경로를 확인합니다 | pointer history, heatmap, drag trajectory overlay |
+| 🎨 **Tomato Identity** | 따뜻한 tomato red 톤의 가벼운 인터랙션 피드백을 제공합니다 | light/dark theme, SFX, favicon, OG image |
 
-- MediaPipe Tasks Vision Hand Landmarker 기반 손 추적
-- 양손 21개 landmark skeleton rendering
-- handedness, confidence, tracking stability 반영
-- unstable frame, jump outlier, lost tolerance 처리
-- React state를 매 프레임 갱신하지 않는 canvas direct rendering 구조
+<br />
 
-### 🤏 Pinch Gesture Interaction
+### Interaction Core
 
-- thumb tip `4`와 index tip `8` 거리 기반 pinch detection
-- 손 크기 차이를 보정하는 normalized pinch distance
-- `pinch-start`, `pinch-hold`, `pinch-release`, `not-pinching` 상태 관리
-- hysteresis, stable frame debounce로 false positive 감소
-- 손별 pinch state 독립 관리
-
-### 🍅 Free-form Capture Box
-
-- 양손 pinch point를 rectangle의 diagonal corners로 사용
-- 손이 교차해도 `min/max` normalization으로 valid rectangle 유지
-- width와 height를 독립적으로 조절
-- raw box, smoothed box, confirmed rect 분리
-- capture/crop에 사용할 `confirmedRect` 저장
-
-### 📸 Snapshot Capture & Crop
-
-- overlay canvas가 아니라 원본 webcam video frame 기준으로 crop
-- mirror preview와 실제 video coordinate 차이 보정
-- confirmed rect 영역만 PNG snapshot으로 저장
-- capture ready window, simultaneous pinch trigger, cooldown lock 적용
-- capture flash feedback 제공
-
-### 🧩 Adaptive Puzzle Generation
-
-- 캡처 영역 크기와 gesture confidence를 기반으로 puzzle difficulty 자동 결정
-- 작은 캡처 영역은 2x2, 중간 영역은 3x3, 큰 영역은 4x4로 생성
-- tracking jitter가 크거나 gesture confidence가 낮으면 난이도 보정
-- hardcoded 3x3/4x4가 아닌 dynamic rows/cols 기반 split
-- shuffle 시 어떤 조각도 자기 정답 위치에 남지 않는 derangement shuffle 적용
-
-### ✨ Gesture-based Puzzle Control
-
-- pinch pointer로 puzzle piece grab, drag, drop
-- forgiving hit test, grab start window, pointer lost tolerance 적용
-- active hand lock, selected piece lock, drag offset freeze로 drag 안정화
-- nearest cell drop, magnetic snap preview, snap success feedback
-- locked piece visual state와 completion detection 제공
-
-### 🔎 Interaction Analysis Replay
-
-- puzzle interaction 동안 pointer trajectory 기록
-- drag path와 체류 영역을 heatmap replay로 시각화
-- completion 후 "인터랙션 분석 보기"로 replay mode 진입
-- tomato glow는 손동작이 집중된 위치, line은 퍼즐 조작 경로를 표현
-- light/dark theme 모두에서 분석 overlay가 보이도록 theme별 렌더링 처리
-
-### 🍅 Tomato Interaction Identity
-
-- tomato red, warm cream, charcoal 기반 visual identity
-- light/dark theme toggle
-- tomato-themed favicon, Open Graph image, app header mark
-- capture, shuffle, snap, lock, completion SFX
-- generated ambient BGM loop와 sound mute toggle
+| Area | Details |
+| --- | --- |
+| **Tracking Stability** | unstable frame, jump outlier, lost tolerance를 적용해 손 좌표가 튀는 상황을 완화합니다. |
+| **Gesture Reliability** | `pinch-start`, `pinch-hold`, `pinch-release`, `not-pinching`을 분리하고, start/release threshold를 다르게 둡니다. |
+| **Spatial Capture** | 양손 pinch point를 rectangle의 diagonal corners로 사용해 손이 교차해도 valid box를 유지합니다. |
+| **Puzzle Interaction** | selected piece, active hand, drag offset을 lock해 drag 중 조각이 갑자기 떨어지는 문제를 줄입니다. |
+| **Completion Feedback** | locked piece visual state, completion overlay, interaction replay로 조작 결과를 명확하게 보여줍니다. |
 
 ---
 
