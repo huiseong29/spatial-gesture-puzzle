@@ -23,7 +23,10 @@ export class CanvasRenderer {
   private themeMode: ThemeMode = "dark";
 
   constructor(canvas: HTMLCanvasElement) {
-    const context = canvas.getContext("2d");
+    const context = canvas.getContext("2d", {
+      alpha: false,
+      desynchronized: true
+    });
 
     if (!context) {
       throw new Error("Canvas 2D context is not available");

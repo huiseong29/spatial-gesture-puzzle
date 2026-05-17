@@ -9,6 +9,7 @@ import { VirtualBoundingBoxTracker } from "../interaction/boundingBox/virtualBou
 import { SnapshotCaptureManager } from "../capture/snapshotCaptureManager";
 import { PuzzleBoardManager } from "../puzzle/puzzleBoardManager";
 import { calculateInteractionConfidence } from "../interaction/interactionConfidence";
+import { InteractionSoundManager } from "../audio/interactionSoundManager";
 import type { ThemeMode } from "../theme/themeTypes";
 
 export type RuntimePhase =
@@ -60,6 +61,7 @@ export class HandTrackingController {
   private readonly virtualBoundingBoxTracker = new VirtualBoundingBoxTracker();
   private readonly snapshotCaptureManager = new SnapshotCaptureManager();
   private readonly puzzleBoardManager = new PuzzleBoardManager();
+  private readonly soundManager: InteractionSoundManager;
   private fpsLastTime = performance.now();
   private fpsFrameCount = 0;
   private fps = 0;
@@ -71,6 +73,7 @@ export class HandTrackingController {
     this.canvas = options.canvas;
     this.onStatus = options.onStatus;
     this.onExperienceState = options.onExperienceState;
+    this.soundManager = new InteractionSoundManager();
     this.renderer = new CanvasRenderer(this.canvas);
   }
 
@@ -82,6 +85,7 @@ export class HandTrackingController {
     this.starting = true;
     this.stopped = false;
     const startToken = ++this.startToken;
+    void this.soundManager.unlock();
     cancelAnimationFrame(this.animationFrameId);
     this.animationFrameId = 0;
     this.resetInteractionRuntime();
@@ -123,6 +127,11 @@ export class HandTrackingController {
   stop() {
     this.stopTrackingResources();
     this.setStatus("stopped", "Camera stopped");
+  }
+
+  dispose() {
+    this.stopTrackingResources();
+    this.soundManager.dispose();
   }
 
   private stopTrackingResources() {
@@ -182,6 +191,10 @@ export class HandTrackingController {
 
     this.puzzleBoardManager.startHeatmapReplay();
     this.publishExperienceState(this.lastFrame);
+  }
+
+  setSoundMuted(muted: boolean) {
+    this.soundManager.setMuted(muted);
   }
 
   setDebugEnabled(enabled: boolean) {
@@ -265,6 +278,7 @@ export class HandTrackingController {
         frame.puzzle = null;
         frame.virtualBoundingBox = null;
       }
+      this.soundManager.update(frame);
       this.publishExperienceState(frame);
       const interactionEnd = performance.now();
       frame.profile = {
@@ -321,6 +335,7 @@ export class HandTrackingController {
   }
 
   private resetInteractionRuntime() {
+    this.lastExperienceStateKey = "";
     this.lastFrame = null;
     this.lastVideoTime = -1;
     this.fps = 0;
@@ -330,6 +345,7 @@ export class HandTrackingController {
     this.virtualBoundingBoxTracker.reset();
     this.snapshotCaptureManager.reset();
     this.puzzleBoardManager.reset();
+    this.soundManager.reset();
     this.publishExperienceState(null);
   }
 

@@ -37,8 +37,17 @@ export async function createPuzzleBoardFromSnapshot(
 function loadSnapshotImage(dataUrl: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Failed to load snapshot image"));
+    image.decoding = "async";
+    image.onload = () => {
+      image.onload = null;
+      image.onerror = null;
+      resolve(image);
+    };
+    image.onerror = () => {
+      image.onload = null;
+      image.onerror = null;
+      reject(new Error("Failed to load snapshot image"));
+    };
     image.src = dataUrl;
   });
 }

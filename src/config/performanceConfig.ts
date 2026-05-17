@@ -1,3 +1,3 @@
 export const performanceConfig = {
-  debugOverlaySampleMs: 100
+  debugOverlaySampleMs: 150
 } as const;

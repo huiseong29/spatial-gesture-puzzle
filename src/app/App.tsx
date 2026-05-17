@@ -7,9 +7,11 @@ type UnifiedTopBarProps = {
   status: RuntimeStatus;
   experienceState: ExperienceState;
   debugEnabled: boolean;
+  soundMuted: boolean;
   themeMode: ThemeMode;
   onStart: () => void;
   onToggleDebug: () => void;
+  onToggleSound: () => void;
   onToggleTheme: () => void;
 };
 
@@ -17,9 +19,11 @@ function UnifiedTopBar({
   status,
   experienceState,
   debugEnabled,
+  soundMuted,
   themeMode,
   onStart,
   onToggleDebug,
+  onToggleSound,
   onToggleTheme
 }: UnifiedTopBarProps) {
   const instruction = getInteractionInstruction(status, experienceState);
@@ -57,6 +61,14 @@ function UnifiedTopBar({
         >
           Debug
         </button>
+        <button
+          type="button"
+          className={soundMuted ? "compact-action" : "compact-action is-active"}
+          onClick={onToggleSound}
+          aria-pressed={!soundMuted}
+        >
+          {soundMuted ? "Sound Off" : "Sound On"}
+        </button>
         <button type="button" className="compact-action" onClick={onToggleTheme}>
           {themeMode === "dark" ? "Light" : "Dark"}
         </button>
@@ -87,6 +99,7 @@ export function App() {
   });
   const [experienceState, setExperienceState] = useState<ExperienceState>(createInitialExperienceState);
   const [debugEnabled, setDebugEnabled] = useState(false);
+  const [soundMuted, setSoundMuted] = useState(() => readStoredSoundMuted());
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredTheme());
   const showStartCard = status.phase !== "running";
   const showAnalysisButton =
@@ -113,7 +126,7 @@ export function App() {
 
     controllerRef.current = controller;
     return () => {
-      controller.stop();
+      controller.dispose();
       controllerRef.current = null;
     };
   }, []);
@@ -123,6 +136,11 @@ export function App() {
     window.localStorage.setItem("spatial-gesture-theme", themeMode);
     controllerRef.current?.setThemeMode(themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem("spatial-gesture-sound-muted", soundMuted ? "true" : "false");
+    controllerRef.current?.setSoundMuted(soundMuted);
+  }, [soundMuted]);
 
   const startCamera = () => {
     void controllerRef.current?.start();
@@ -156,6 +174,10 @@ export function App() {
     controllerRef.current?.setDebugEnabled(next);
   };
 
+  const toggleSound = () => {
+    setSoundMuted((current) => !current);
+  };
+
   const toggleTheme = () => {
     setThemeMode((current) => (current === "dark" ? "light" : "dark"));
   };
@@ -171,9 +193,11 @@ export function App() {
             status={status}
             experienceState={experienceState}
             debugEnabled={debugEnabled}
+            soundMuted={soundMuted}
             themeMode={themeMode}
             onStart={startCamera}
             onToggleDebug={toggleDebug}
+            onToggleSound={toggleSound}
             onToggleTheme={toggleTheme}
           />
 
@@ -260,4 +284,8 @@ export function App() {
 function readStoredTheme(): ThemeMode {
   const stored = window.localStorage.getItem("spatial-gesture-theme");
   return stored === "light" || stored === "dark" ? stored : "light";
+}
+
+function readStoredSoundMuted() {
+  return window.localStorage.getItem("spatial-gesture-sound-muted") === "true";
 }

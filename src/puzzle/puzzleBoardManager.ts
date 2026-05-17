@@ -107,6 +107,7 @@ export class PuzzleBoardManager {
   reset() {
     this.board = null;
     this.loadingSnapshotId = null;
+    this.latestSnapshot = null;
     this.autoResetRequested = false;
   }
 

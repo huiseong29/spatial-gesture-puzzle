@@ -1,5 +1,5 @@
 import { puzzleConfig } from "../config/puzzleConfig";
-import type { PuzzleBoard } from "../puzzle/puzzleTypes";
+import type { PuzzleBoard, PuzzlePiece } from "../puzzle/puzzleTypes";
 import type { InteractionConfidenceState } from "../tracking/handTypes";
 import { renderInteractionHeatmap } from "./heatmapRenderer";
 import { getRipenessTheme } from "./ripenessTheme";
@@ -33,65 +33,20 @@ export function renderPuzzleBoard(
 
   renderSnapPreview(context, board, theme, tokens);
 
-  const selectedPiece = board.pieces.find((piece) => piece.id === board.interaction.selectedPieceId);
-  const drawPieces = selectedPiece
-    ? [...board.pieces.filter((piece) => piece.id !== selectedPiece.id), selectedPiece]
-    : board.pieces;
+  const selectedPieceId = board.interaction.selectedPieceId;
+  let selectedPiece: PuzzlePiece | null = null;
 
-  for (const piece of drawPieces) {
-    const selected = piece.id === board.interaction.selectedPieceId && !piece.locked;
-    const snapped = piece.id === board.interaction.lastSnapPieceId;
-    const snapPulse = snapped ? getSnapPulse(board) : 0;
-    const displayRect = getDisplayRect(piece.correctRect, piece.currentRect, transition.pieceProgress(piece.originalIndex));
-    const radius = selected ? 14 : 11;
-
-    if (transition.pieceOpacity <= 0) {
+  for (const piece of board.pieces) {
+    if (piece.id === selectedPieceId) {
+      selectedPiece = piece;
       continue;
     }
 
-    context.globalAlpha = transition.pieceOpacity * (1 - completion.mergeOpacity * 0.38);
-    context.shadowColor = getPieceShadowColor(selected, snapped, piece.locked, snapPulse, theme.accentGlow, tokens.lockedAccent);
-    context.shadowBlur = getPieceShadowBlur(selected, snapped, piece.locked, snapPulse, theme.pulse);
-    context.shadowOffsetY = selected ? 6 : piece.locked ? 1 : 3;
+    renderPiece(context, board, piece, false, transition, completion, theme, tokens);
+  }
 
-    context.save();
-    roundRect(context, displayRect.x, displayRect.y, displayRect.width, displayRect.height, radius);
-    context.clip();
-    context.drawImage(
-      board.image,
-      piece.sourceRect.x,
-      piece.sourceRect.y,
-      piece.sourceRect.width,
-      piece.sourceRect.height,
-      displayRect.x,
-      displayRect.y,
-      displayRect.width,
-      displayRect.height
-    );
-    context.restore();
-
-    context.shadowBlur = 0;
-    context.shadowOffsetY = 0;
-    context.strokeStyle = getPieceStrokeStyle(selected, snapped, piece.locked, snapPulse, theme.accent, tokens.lockedAccent);
-    context.lineWidth = piece.locked
-      ? puzzleConfig.lockedOutlineWidth
-      : selected
-        ? 3
-        : snapped
-          ? 2.5 + snapPulse * 2
-          : 1.5;
-    roundRect(context, displayRect.x, displayRect.y, displayRect.width, displayRect.height, radius);
-    context.stroke();
-
-    if (piece.locked) {
-      renderLockedMarker(context, displayRect, radius, snapPulse, tokens);
-    }
-
-    if (snapped || (piece.locked && snapPulse > 0)) {
-      renderSnapPulse(context, displayRect, radius, snapPulse, theme);
-    }
-
-    context.globalAlpha = 1;
+  if (selectedPiece) {
+    renderPiece(context, board, selectedPiece, !selectedPiece.locked, transition, completion, theme, tokens);
   }
 
   if (completion.mergeOpacity > 0) {
@@ -115,6 +70,70 @@ export function renderPuzzleBoard(
   }
 
   context.restore();
+}
+
+function renderPiece(
+  context: CanvasRenderingContext2D,
+  board: PuzzleBoard,
+  piece: PuzzlePiece,
+  selected: boolean,
+  transition: ReturnType<typeof getTransitionProgress>,
+  completion: ReturnType<typeof getCompletionProgress>,
+  theme: ReturnType<typeof getRipenessTheme>,
+  tokens: ReturnType<typeof getThemeTokens>
+) {
+  if (transition.pieceOpacity <= 0 || !board.image) {
+    return;
+  }
+
+  const snapped = piece.id === board.interaction.lastSnapPieceId;
+  const snapPulse = snapped ? getSnapPulse(board) : 0;
+  const displayRect = getDisplayRect(piece.correctRect, piece.currentRect, transition.pieceProgress(piece.originalIndex));
+  const radius = selected ? 14 : 11;
+
+  context.globalAlpha = transition.pieceOpacity * (1 - completion.mergeOpacity * 0.38);
+  context.shadowColor = getPieceShadowColor(selected, snapped, piece.locked, snapPulse, theme.accentGlow, tokens.lockedAccent);
+  context.shadowBlur = getPieceShadowBlur(selected, snapped, piece.locked, snapPulse, theme.pulse);
+  context.shadowOffsetY = selected ? 6 : piece.locked ? 1 : 3;
+
+  context.save();
+  roundRect(context, displayRect.x, displayRect.y, displayRect.width, displayRect.height, radius);
+  context.clip();
+  context.drawImage(
+    board.image,
+    piece.sourceRect.x,
+    piece.sourceRect.y,
+    piece.sourceRect.width,
+    piece.sourceRect.height,
+    displayRect.x,
+    displayRect.y,
+    displayRect.width,
+    displayRect.height
+  );
+  context.restore();
+
+  context.shadowBlur = 0;
+  context.shadowOffsetY = 0;
+  context.strokeStyle = getPieceStrokeStyle(selected, snapped, piece.locked, snapPulse, theme.accent, tokens.lockedAccent);
+  context.lineWidth = piece.locked
+    ? puzzleConfig.lockedOutlineWidth
+    : selected
+      ? 3
+      : snapped
+        ? 2.5 + snapPulse * 2
+        : 1.5;
+  roundRect(context, displayRect.x, displayRect.y, displayRect.width, displayRect.height, radius);
+  context.stroke();
+
+  if (piece.locked) {
+    renderLockedMarker(context, displayRect, radius, snapPulse, tokens);
+  }
+
+  if (snapped || (piece.locked && snapPulse > 0)) {
+    renderSnapPulse(context, displayRect, radius, snapPulse, theme);
+  }
+
+  context.globalAlpha = 1;
 }
 
 function renderSnapPreview(
