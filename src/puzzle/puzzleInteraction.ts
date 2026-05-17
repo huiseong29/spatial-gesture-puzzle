@@ -29,7 +29,7 @@ export function updatePuzzleInteraction(
   const dragPointer = resolveDragPointer(board, rawPointer, hasSelection);
   const pointer = dragPointer.pointer;
   const now = performance.now();
-  let pieces = board.pieces.map((piece) => ({ ...piece }));
+  let pieces = board.pieces;
   let interaction: PuzzleInteractionState = {
     ...board.interaction,
     activeHandId: hasSelection ? board.interaction.activeHandId : board.interaction.activeHandId,
@@ -380,7 +380,8 @@ function hitTestPieceForgiving(pieces: PuzzlePiece[], pointer: ScreenPoint) {
   let bestPiece: PuzzlePiece | null = null;
   let bestDistance = Infinity;
 
-  for (const piece of [...pieces].reverse()) {
+  for (let index = pieces.length - 1; index >= 0; index -= 1) {
+    const piece = pieces[index];
     if (piece.locked) {
       continue;
     }

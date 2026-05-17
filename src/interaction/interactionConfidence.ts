@@ -13,14 +13,23 @@ type CalculateInteractionConfidenceOptions = {
 export function calculateInteractionConfidence(
   options: CalculateInteractionConfidenceOptions
 ): InteractionConfidenceState {
-  const stableHands = options.hands.filter((hand) => hand.trackingState === "stable");
-  const stableRatio = options.hands.length === 0 ? 0 : stableHands.length / options.hands.length;
-  const handQuality = stableHands.length > 0
-    ? average(stableHands.map((hand) => hand.trackingQuality))
-    : 0;
-  const jitterPx = stableHands.length > 0
-    ? average(stableHands.map((hand) => hand.jumpDistancePx))
-    : ripenessConfig.jitterPenaltyPx;
+  let stableHandCount = 0;
+  let trackingQualitySum = 0;
+  let jumpDistanceSum = 0;
+
+  for (const hand of options.hands) {
+    if (hand.trackingState !== "stable") {
+      continue;
+    }
+
+    stableHandCount += 1;
+    trackingQualitySum += hand.trackingQuality;
+    jumpDistanceSum += hand.jumpDistancePx;
+  }
+
+  const stableRatio = options.hands.length === 0 ? 0 : stableHandCount / options.hands.length;
+  const handQuality = stableHandCount > 0 ? trackingQualitySum / stableHandCount : 0;
+  const jitterPx = stableHandCount > 0 ? jumpDistanceSum / stableHandCount : ripenessConfig.jitterPenaltyPx;
   const jitterScore = 1 - clamp01(jitterPx / ripenessConfig.jitterPenaltyPx);
   const pinchScore = calculatePinchScore(options.pinchGestures);
   const lagPx = options.puzzle?.interaction.pointerLagPx ?? 0;
@@ -38,7 +47,7 @@ export function calculateInteractionConfidence(
   return {
     score,
     ripeness: score,
-    stableHands: stableHands.length,
+    stableHands: stableHandCount,
     gestureConfidence: pinchScore,
     jitterPx,
     lagPx
@@ -46,23 +55,21 @@ export function calculateInteractionConfidence(
 }
 
 function calculatePinchScore(gestures: Map<string, PinchGestureState>) {
-  const activeGestures = [...gestures.values()].filter((gesture) => gesture.isPinching);
+  let activeGestureCount = 0;
+  let scoreSum = 0;
 
-  if (activeGestures.length === 0) {
-    return 0.35;
+  for (const gesture of gestures.values()) {
+    if (!gesture.isPinching) {
+      continue;
+    }
+
+    const closeScore = 1 - clamp01(gesture.normalizedDistance / Math.max(gesture.releaseThreshold, 0.001));
+    const stabilityScore = clamp01((gesture.stableCloseFrames + gesture.stableOpenFrames) / 8);
+    scoreSum += closeScore * 0.72 + stabilityScore * 0.28;
+    activeGestureCount += 1;
   }
 
-  return average(
-    activeGestures.map((gesture) => {
-      const closeScore = 1 - clamp01(gesture.normalizedDistance / Math.max(gesture.releaseThreshold, 0.001));
-      const stabilityScore = clamp01((gesture.stableCloseFrames + gesture.stableOpenFrames) / 8);
-      return closeScore * 0.72 + stabilityScore * 0.28;
-    })
-  );
-}
-
-function average(values: number[]) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+  return activeGestureCount === 0 ? 0.35 : scoreSum / activeGestureCount;
 }
 
 function clamp01(value: number) {

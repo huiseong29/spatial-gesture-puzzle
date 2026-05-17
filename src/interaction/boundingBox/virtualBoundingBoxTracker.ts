@@ -23,7 +23,7 @@ export class VirtualBoundingBoxTracker {
   private box: VirtualBoundingBox | null = null;
 
   update(options: UpdateOptions): VirtualBoundingBox | null {
-    const hands = options.hands.filter((hand) => hand.trackingState === "stable").slice(0, 2);
+    const hands = getFirstStableHands(options.hands);
 
     if (hands.length < 2) {
       return this.updateLost(options.timestamp);
@@ -95,6 +95,23 @@ export class VirtualBoundingBoxTracker {
 
     return this.box;
   }
+}
+
+function getFirstStableHands(hands: TrackedHand[]) {
+  const stableHands: TrackedHand[] = [];
+
+  for (const hand of hands) {
+    if (hand.trackingState !== "stable") {
+      continue;
+    }
+
+    stableHands.push(hand);
+    if (stableHands.length === 2) {
+      break;
+    }
+  }
+
+  return stableHands;
 }
 
 function getPinchCornerPair(

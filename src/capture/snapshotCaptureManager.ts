@@ -210,13 +210,28 @@ function getCaptureBlockReason(frame: TrackingFrame): CaptureFailureReason {
     return "no-confirmed-rect";
   }
 
-  const gestures = [...frame.pinchGestures.values()];
-  return gestures.filter((gesture) => gesture.isPinching).length >= 2 ? "none" : "not-ready";
+  let pinchingCount = 0;
+  for (const gesture of frame.pinchGestures.values()) {
+    if (gesture.isPinching) {
+      pinchingCount += 1;
+    }
+
+    if (pinchingCount >= 2) {
+      return "none";
+    }
+  }
+
+  return "not-ready";
 }
 
 function calculateGestureConfidence(frame: TrackingFrame) {
   const hands = frame.hands.filter((hand) => hand.trackingState === "stable");
-  const gestures = [...frame.pinchGestures.values()].filter((gesture) => gesture.isPinching);
+  const gestures: PinchGestureState[] = [];
+  for (const gesture of frame.pinchGestures.values()) {
+    if (gesture.isPinching) {
+      gestures.push(gesture);
+    }
+  }
 
   if (hands.length === 0 || gestures.length === 0) {
     return 0;
