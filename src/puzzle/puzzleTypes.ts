@@ -14,6 +14,14 @@ export type PuzzleTransitionState = {
   completedAt: number;
 };
 
+export type SnapPreview = {
+  cellIndex: number;
+  cellRect: Rect;
+  distancePx: number;
+  isCorrect: boolean;
+  strength: number;
+} | null;
+
 export type PuzzlePiece = {
   id: string;
   originalIndex: number;
@@ -46,9 +54,12 @@ export type PuzzleInteractionState = {
   originCellIndex: number | null;
   hoveredPieceId: string | null;
   lastSnapPieceId: string | null;
+  lastSnapAt: number;
+  snapPreview: SnapPreview;
   snapDistancePx: number | null;
   nearestCellIndex: number | null;
   completed: boolean;
+  completedAt: number;
 };
 
 export type PuzzleBoard = {

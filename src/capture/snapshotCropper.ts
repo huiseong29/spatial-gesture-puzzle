@@ -30,17 +30,12 @@ export function captureSnapshot(options: CaptureSnapshotOptions): Snapshot | nul
     return null;
   }
 
-  context.drawImage(
-    options.video,
-    cropRectVideo.x,
-    cropRectVideo.y,
-    cropRectVideo.width,
-    cropRectVideo.height,
-    0,
-    0,
+  drawVideoCropInPreviewSpace(context, {
+    video: options.video,
+    cropRectVideo,
     width,
     height
-  );
+  });
 
   return {
     id: `snapshot-${Math.round(options.timestamp)}`,
@@ -51,6 +46,47 @@ export function captureSnapshot(options: CaptureSnapshotOptions): Snapshot | nul
     cropRectCanvas: { ...options.cropRectCanvas },
     cropRectVideo,
   };
+}
+
+function drawVideoCropInPreviewSpace(
+  context: CanvasRenderingContext2D,
+  options: {
+    video: HTMLVideoElement;
+    cropRectVideo: Rect;
+    width: number;
+    height: number;
+  }
+) {
+  if (coordinateConfig.mirrorPreview || coordinateConfig.useViewerSpace) {
+    context.save();
+    context.translate(options.width, 0);
+    context.scale(-1, 1);
+    context.drawImage(
+      options.video,
+      options.cropRectVideo.x,
+      options.cropRectVideo.y,
+      options.cropRectVideo.width,
+      options.cropRectVideo.height,
+      0,
+      0,
+      options.width,
+      options.height
+    );
+    context.restore();
+    return;
+  }
+
+  context.drawImage(
+    options.video,
+    options.cropRectVideo.x,
+    options.cropRectVideo.y,
+    options.cropRectVideo.width,
+    options.cropRectVideo.height,
+    0,
+    0,
+    options.width,
+    options.height
+  );
 }
 
 function canvasRectToVideoRect(options: {

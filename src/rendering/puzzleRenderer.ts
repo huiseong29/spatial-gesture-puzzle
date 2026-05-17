@@ -1,3 +1,4 @@
+import { puzzleConfig } from "../config/puzzleConfig";
 import type { PuzzleBoard } from "../puzzle/puzzleTypes";
 
 export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: PuzzleBoard | null) {
@@ -11,11 +12,14 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
 
   context.save();
   const transition = getTransitionProgress(board);
+  const completion = getCompletionProgress(board);
   renderBoardFrame(context, board, transition.gridOpacity);
 
   if (board.mode === "transitioning") {
     renderFrozenSnapshot(context, board, transition.snapshotOpacity);
   }
+
+  renderSnapPreview(context, board);
 
   const selectedPiece = board.pieces.find((piece) => piece.id === board.interaction.selectedPieceId);
   const drawPieces = selectedPiece
@@ -23,8 +27,9 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
     : board.pieces;
 
   for (const piece of drawPieces) {
-    const selected = piece.id === board.interaction.selectedPieceId;
+    const selected = piece.id === board.interaction.selectedPieceId && !piece.locked;
     const snapped = piece.id === board.interaction.lastSnapPieceId;
+    const snapPulse = snapped ? getSnapPulse(board) : 0;
     const displayRect = getDisplayRect(piece.correctRect, piece.currentRect, transition.pieceProgress(piece.originalIndex));
     const radius = selected ? 14 : 11;
 
@@ -32,24 +37,13 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
       continue;
     }
 
-    context.globalAlpha = transition.pieceOpacity;
-    context.shadowColor = selected
-      ? "rgba(239, 68, 68, 0.62)"
-      : snapped || piece.locked
-        ? "rgba(251, 146, 60, 0.42)"
-        : "rgba(24, 10, 8, 0.34)";
-    context.shadowBlur = selected ? 20 : snapped || piece.locked ? 14 : 7;
-    context.shadowOffsetY = selected ? 6 : 3;
+    context.globalAlpha = transition.pieceOpacity * (1 - completion.mergeOpacity * 0.38);
+    context.shadowColor = getPieceShadowColor(selected, snapped, piece.locked, snapPulse);
+    context.shadowBlur = getPieceShadowBlur(selected, snapped, piece.locked, snapPulse);
+    context.shadowOffsetY = selected ? 6 : piece.locked ? 1 : 3;
 
     context.save();
-    roundRect(
-      context,
-      displayRect.x,
-      displayRect.y,
-      displayRect.width,
-      displayRect.height,
-      radius
-    );
+    roundRect(context, displayRect.x, displayRect.y, displayRect.width, displayRect.height, radius);
     context.clip();
     context.drawImage(
       board.image,
@@ -66,43 +60,33 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
 
     context.shadowBlur = 0;
     context.shadowOffsetY = 0;
-    context.strokeStyle = piece.locked
-      ? "rgba(254, 215, 170, 0.92)"
+    context.strokeStyle = getPieceStrokeStyle(selected, snapped, piece.locked, snapPulse);
+    context.lineWidth = piece.locked
+      ? puzzleConfig.lockedOutlineWidth
       : selected
-        ? "rgba(239, 68, 68, 0.98)"
-        : "rgba(255, 237, 213, 0.58)";
-    context.lineWidth = selected ? 3 : 1.5;
-    roundRect(
-      context,
-      displayRect.x,
-      displayRect.y,
-      displayRect.width,
-      displayRect.height,
-      radius
-    );
+        ? 3
+        : snapped
+          ? 2.5 + snapPulse * 2
+          : 1.5;
+    roundRect(context, displayRect.x, displayRect.y, displayRect.width, displayRect.height, radius);
     context.stroke();
 
-    if (snapped) {
-      context.save();
-      context.strokeStyle = "rgba(239, 68, 68, 0.72)";
-      context.lineWidth = 5;
-      context.shadowColor = "rgba(239, 68, 68, 0.55)";
-      context.shadowBlur = 18;
-      roundRect(
-        context,
-        displayRect.x - 5,
-        displayRect.y - 5,
-        displayRect.width + 10,
-        displayRect.height + 10,
-        radius + 4
-      );
-      context.stroke();
-      context.restore();
+    if (piece.locked) {
+      renderLockedMarker(context, displayRect, radius, snapPulse);
     }
+
+    if (snapped || (piece.locked && snapPulse > 0)) {
+      renderSnapPulse(context, displayRect, radius, snapPulse);
+    }
+
     context.globalAlpha = 1;
   }
 
-  if (board.interaction.pointer) {
+  if (completion.mergeOpacity > 0) {
+    renderMergedImage(context, board, completion.mergeOpacity);
+  }
+
+  if (board.interaction.pointer && board.mode !== "completed") {
     context.fillStyle = "rgba(239, 68, 68, 0.95)";
     context.shadowColor = "rgba(239, 68, 68, 0.52)";
     context.shadowBlur = 14;
@@ -113,9 +97,38 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
   }
 
   if (board.mode === "completed") {
-    renderCompletionOverlay(context, board);
+    renderCompletionOverlay(context, board, completion);
   }
 
+  context.restore();
+}
+
+function renderSnapPreview(context: CanvasRenderingContext2D, board: PuzzleBoard) {
+  const preview = board.interaction.snapPreview;
+
+  if (!preview || board.mode !== "ready") {
+    return;
+  }
+
+  const alpha = preview.isCorrect
+    ? puzzleConfig.correctGlowAlpha * (0.45 + preview.strength * 0.55)
+    : 0.16 + preview.strength * 0.18;
+  const rect = preview.cellRect;
+
+  context.save();
+  context.shadowColor = preview.isCorrect ? "rgba(239, 68, 68, 0.64)" : "rgba(254, 215, 170, 0.42)";
+  context.shadowBlur = preview.isCorrect ? 18 + preview.strength * 16 : 10 + preview.strength * 8;
+  context.fillStyle = preview.isCorrect
+    ? `rgba(239, 68, 68, ${alpha})`
+    : `rgba(254, 215, 170, ${alpha})`;
+  roundRect(context, rect.x, rect.y, rect.width, rect.height, puzzleConfig.cellHighlightRadius);
+  context.fill();
+  context.strokeStyle = preview.isCorrect
+    ? `rgba(239, 68, 68, ${0.7 + preview.strength * 0.28})`
+    : `rgba(254, 215, 170, ${0.42 + preview.strength * 0.34})`;
+  context.lineWidth = preview.isCorrect ? 3 : 2;
+  roundRect(context, rect.x, rect.y, rect.width, rect.height, puzzleConfig.cellHighlightRadius);
+  context.stroke();
   context.restore();
 }
 
@@ -160,9 +173,23 @@ function renderFrozenSnapshot(context: CanvasRenderingContext2D, board: PuzzleBo
     return;
   }
 
+  renderImageInBoard(context, board, opacity);
+}
+
+function renderMergedImage(context: CanvasRenderingContext2D, board: PuzzleBoard, opacity: number) {
+  renderImageInBoard(context, board, opacity * 0.96);
+}
+
+function renderImageInBoard(context: CanvasRenderingContext2D, board: PuzzleBoard, opacity: number) {
+  if (!board.image) {
+    return;
+  }
+
   const image = board.image;
   context.save();
   context.globalAlpha = opacity;
+  context.shadowColor = "rgba(239, 68, 68, 0.28)";
+  context.shadowBlur = 22 * opacity;
   roundRect(context, board.boardRect.x, board.boardRect.y, board.boardRect.width, board.boardRect.height, 14);
   context.clip();
   context.drawImage(
@@ -179,26 +206,126 @@ function renderFrozenSnapshot(context: CanvasRenderingContext2D, board: PuzzleBo
   context.restore();
 }
 
-function renderCompletionOverlay(context: CanvasRenderingContext2D, board: PuzzleBoard) {
-  const label = "퍼즐 완성";
-  const subLabel = "모든 조각이 정답 위치에 배치되었습니다";
+function renderCompletionOverlay(
+  context: CanvasRenderingContext2D,
+  board: PuzzleBoard,
+  completion: ReturnType<typeof getCompletionProgress>
+) {
+  const centerX = board.boardRect.x + board.boardRect.width / 2;
+  const centerY = board.boardRect.y + board.boardRect.height / 2;
+  const fadeOut = completion.fadeOutProgress;
+  const alpha = 1 - fadeOut;
 
   context.save();
-  context.fillStyle = "rgba(24, 10, 8, 0.74)";
+  context.globalAlpha = alpha;
+  context.fillStyle = "rgba(24, 10, 8, 0.48)";
   roundRect(context, board.boardRect.x, board.boardRect.y, board.boardRect.width, board.boardRect.height, 14);
   context.fill();
+
   context.shadowColor = "rgba(239, 68, 68, 0.52)";
   context.shadowBlur = 18;
   context.font = "800 30px Inter, system-ui, sans-serif";
   context.textBaseline = "middle";
   context.textAlign = "center";
   context.fillStyle = "rgba(255, 237, 213, 0.98)";
-  context.fillText(label, board.boardRect.x + board.boardRect.width / 2, board.boardRect.y + board.boardRect.height / 2 - 12);
+  context.fillText("퍼즐 완성", centerX, centerY - 14);
   context.shadowBlur = 0;
-  context.font = "600 16px Inter, system-ui, sans-serif";
-  context.fillStyle = "rgba(254, 215, 170, 0.95)";
-  context.fillText(subLabel, board.boardRect.x + board.boardRect.width / 2, board.boardRect.y + board.boardRect.height / 2 + 26);
+  context.font = "600 15px Inter, system-ui, sans-serif";
+  context.fillStyle = "rgba(254, 215, 170, 0.92)";
+  context.fillText("잠시 후 캡처 단계로 돌아갑니다", centerX, centerY + 24);
+
+  context.strokeStyle = `rgba(239, 68, 68, ${0.44 + completion.displayProgress * 0.28})`;
+  context.lineWidth = 4;
+  roundRect(
+    context,
+    board.boardRect.x - 10,
+    board.boardRect.y - 10,
+    board.boardRect.width + 20,
+    board.boardRect.height + 20,
+    20
+  );
+  context.stroke();
   context.restore();
+}
+
+function renderLockedMarker(
+  context: CanvasRenderingContext2D,
+  rect: { x: number; y: number; width: number; height: number },
+  radius: number,
+  pulse: number
+) {
+  context.save();
+  context.fillStyle = `rgba(134, 239, 172, ${puzzleConfig.lockedFillAlpha})`;
+  roundRect(context, rect.x, rect.y, rect.width, rect.height, radius);
+  context.fill();
+  context.shadowColor = `rgba(134, 239, 172, ${puzzleConfig.lockedGlowAlpha})`;
+  context.shadowBlur = 8 + pulse * 5;
+  context.strokeStyle = `rgba(134, 239, 172, ${0.62 + pulse * 0.1})`;
+  context.lineWidth = puzzleConfig.lockedOutlineWidth;
+  roundRect(context, rect.x + 1.5, rect.y + 1.5, rect.width - 3, rect.height - 3, Math.max(4, radius - 2));
+  context.stroke();
+  context.shadowBlur = 0;
+  context.restore();
+}
+
+function renderSnapPulse(
+  context: CanvasRenderingContext2D,
+  rect: { x: number; y: number; width: number; height: number },
+  radius: number,
+  pulse: number
+) {
+  context.save();
+  context.globalAlpha = 0.35 + pulse * 0.55;
+  context.strokeStyle = "rgba(239, 68, 68, 0.72)";
+  context.lineWidth = 4 + pulse * 3;
+  context.shadowColor = "rgba(239, 68, 68, 0.55)";
+  context.shadowBlur = 16 + pulse * 16;
+  roundRect(
+    context,
+    rect.x - 5 - pulse * 5,
+    rect.y - 5 - pulse * 5,
+    rect.width + 10 + pulse * 10,
+    rect.height + 10 + pulse * 10,
+    radius + 4
+  );
+  context.stroke();
+  context.restore();
+}
+
+function getPieceShadowColor(selected: boolean, snapped: boolean, locked: boolean, pulse: number) {
+  if (locked) {
+    return `rgba(134, 239, 172, ${puzzleConfig.lockedGlowAlpha + pulse * 0.08})`;
+  }
+
+  if (selected) {
+    return `rgba(239, 68, 68, ${0.62 + pulse * 0.22})`;
+  }
+
+  return snapped ? "rgba(251, 146, 60, 0.42)" : "rgba(24, 10, 8, 0.34)";
+}
+
+function getPieceShadowBlur(selected: boolean, snapped: boolean, locked: boolean, pulse: number) {
+  if (locked) {
+    return 6 + pulse * 5;
+  }
+
+  if (selected) {
+    return 20 + pulse * 10;
+  }
+
+  return snapped ? 14 + pulse * 14 : 7;
+}
+
+function getPieceStrokeStyle(selected: boolean, snapped: boolean, locked: boolean, pulse: number) {
+  if (locked) {
+    return `rgba(134, 239, 172, ${0.62 + pulse * 0.1})`;
+  }
+
+  if (selected) {
+    return "rgba(239, 68, 68, 0.98)";
+  }
+
+  return snapped ? "rgba(239, 68, 68, 0.88)" : "rgba(255, 237, 213, 0.58)";
 }
 
 function roundRect(
@@ -251,7 +378,38 @@ function getTransitionProgress(board: PuzzleBoard) {
   };
 }
 
-function getDisplayRect(from: { x: number; y: number; width: number; height: number }, to: { x: number; y: number; width: number; height: number }, progress: number) {
+function getCompletionProgress(board: PuzzleBoard) {
+  if (board.mode !== "completed" || !board.interaction.completedAt) {
+    return {
+      displayProgress: 0,
+      fadeOutProgress: 0,
+      mergeOpacity: 0
+    };
+  }
+
+  const elapsed = performance.now() - board.interaction.completedAt;
+  const fadeStart = puzzleConfig.completionDisplayMs;
+
+  return {
+    displayProgress: clamp01(elapsed / puzzleConfig.completionDisplayMs),
+    fadeOutProgress: clamp01((elapsed - fadeStart) / puzzleConfig.autoResetFadeMs),
+    mergeOpacity: easeOutCubic(clamp01(elapsed / 720))
+  };
+}
+
+function getSnapPulse(board: PuzzleBoard) {
+  if (!board.interaction.lastSnapAt) {
+    return 0;
+  }
+
+  return 1 - clamp01((performance.now() - board.interaction.lastSnapAt) / puzzleConfig.snapPulseMs);
+}
+
+function getDisplayRect(
+  from: { x: number; y: number; width: number; height: number },
+  to: { x: number; y: number; width: number; height: number },
+  progress: number
+) {
   const popScale = 1 + Math.sin(progress * Math.PI) * 0.035;
   const width = lerp(from.width, to.width, progress) * popScale;
   const height = lerp(from.height, to.height, progress) * popScale;

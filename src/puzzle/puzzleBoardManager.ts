@@ -1,4 +1,5 @@
 import type { Snapshot } from "../capture/snapshotTypes";
+import { puzzleConfig } from "../config/puzzleConfig";
 import type { PinchGestureState } from "../interaction/gestures/pinchTypes";
 import type { TrackedHand } from "../tracking/handTypes";
 import { createPuzzleBoardFromSnapshot } from "./puzzleGenerator";
@@ -9,6 +10,7 @@ export class PuzzleBoardManager {
   private board: PuzzleBoard | null = null;
   private loadingSnapshotId: string | null = null;
   private latestSnapshot: Snapshot | null = null;
+  private autoResetRequested = false;
 
   updateFromSnapshot(
     snapshot: Snapshot | null,
@@ -25,6 +27,11 @@ export class PuzzleBoardManager {
 
     if (this.board?.snapshotId === snapshot.id || this.loadingSnapshotId === snapshot.id) {
       this.board = this.updateTransition(this.board);
+      this.board = this.updateCompletionAutoReset(this.board);
+
+      if (this.autoResetRequested) {
+        return null;
+      }
 
       if (this.board?.mode === "ready") {
         this.board = updatePuzzleInteraction(this.board, hands, pinchGestures);
@@ -80,9 +87,12 @@ export class PuzzleBoardManager {
         originCellIndex: null,
         hoveredPieceId: null,
         lastSnapPieceId: null,
+        lastSnapAt: 0,
+        snapPreview: null,
         snapDistancePx: null,
         nearestCellIndex: null,
-        completed: false
+        completed: false,
+        completedAt: 0
       }
     };
   }
@@ -90,6 +100,7 @@ export class PuzzleBoardManager {
   reset() {
     this.board = null;
     this.loadingSnapshotId = null;
+    this.autoResetRequested = false;
   }
 
   restart(canvasWidth: number, canvasHeight: number) {
@@ -100,6 +111,7 @@ export class PuzzleBoardManager {
     const snapshot = this.latestSnapshot;
     this.board = null;
     this.loadingSnapshotId = snapshot.id;
+    this.autoResetRequested = false;
 
     void createPuzzleBoardFromSnapshot(snapshot, canvasWidth, canvasHeight)
       .then((board) => {
@@ -119,6 +131,13 @@ export class PuzzleBoardManager {
     this.board = null;
     this.loadingSnapshotId = null;
     this.latestSnapshot = null;
+    this.autoResetRequested = false;
+  }
+
+  consumeAutoResetRequested() {
+    const requested = this.autoResetRequested;
+    this.autoResetRequested = false;
+    return requested;
   }
 
   private updateTransition(board: PuzzleBoard | null) {
@@ -149,5 +168,26 @@ export class PuzzleBoardManager {
         phase
       }
     };
+  }
+
+  private updateCompletionAutoReset(board: PuzzleBoard | null) {
+    if (!board || board.mode !== "completed" || !board.interaction.completedAt) {
+      return board;
+    }
+
+    const resetAt =
+      board.interaction.completedAt +
+      puzzleConfig.completionDisplayMs +
+      puzzleConfig.autoResetFadeMs;
+
+    if (performance.now() < resetAt) {
+      return board;
+    }
+
+    this.board = null;
+    this.loadingSnapshotId = null;
+    this.latestSnapshot = null;
+    this.autoResetRequested = true;
+    return null;
   }
 }

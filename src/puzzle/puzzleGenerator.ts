@@ -189,9 +189,12 @@ function createInitialInteraction(): PuzzleInteractionState {
     originCellIndex: null,
     hoveredPieceId: null,
     lastSnapPieceId: null,
+    lastSnapAt: 0,
+    snapPreview: null,
     snapDistancePx: null,
     nearestCellIndex: null,
-    completed: false
+    completed: false,
+    completedAt: 0
   };
 }
 

@@ -10,13 +10,17 @@ export function isPuzzleCompleted(pieces: PuzzlePiece[]) {
 
 export function withCompletionState(board: PuzzleBoard): PuzzleBoard {
   const completed = isPuzzleCompleted(board.pieces);
+  const completedAt = completed && !board.interaction.completed
+    ? performance.now()
+    : board.interaction.completedAt;
 
   return {
     ...board,
     mode: completed ? "completed" : board.mode,
     interaction: {
       ...board.interaction,
-      completed
+      completed,
+      completedAt
     }
   };
 }

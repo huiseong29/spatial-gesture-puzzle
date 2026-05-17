@@ -189,6 +189,14 @@ export class HandTrackingController {
         interactionHands,
         frame.pinchGestures
       );
+
+      if (this.puzzleBoardManager.consumeAutoResetRequested()) {
+        this.snapshotCaptureManager.clearSnapshot();
+        this.virtualBoundingBoxTracker.reset();
+        frame.capture = null;
+        frame.puzzle = null;
+        frame.virtualBoundingBox = null;
+      }
       const interactionEnd = performance.now();
       frame.profile = {
         detectMs: detectEnd - detectStart,

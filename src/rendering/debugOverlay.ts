@@ -101,12 +101,14 @@ function formatPuzzleLines(puzzle: PuzzleBoard | null, pinchGestures: Map<string
     `Puzzle ${puzzle.mode}`,
     `  transition ${puzzle.transition?.phase ?? "-"} ${formatTransitionProgress(puzzle)}`,
     `  pieces ${puzzle.pieces.length}`,
+    `  lockedPieces ${getLockedPieceCount(puzzle.pieces)}/${puzzle.pieces.length}`,
     `  board ${Math.round(puzzle.boardRect.width)} x ${Math.round(puzzle.boardRect.height)}`,
     `  completed ${interaction.completed ? "yes" : "no"}`,
     `  dragPhase ${interaction.dragPhase}`,
     `  selected ${interaction.selectedPieceId ?? "-"} activeHand ${interaction.activeHandId ?? "-"}`,
     `  hover ${interaction.hoveredPieceId ?? "-"}`,
     `  grabWindow ${interaction.grabWindowFrames} nearestCell ${interaction.nearestCellIndex ?? "-"}`,
+    `  snapPreview ${interaction.snapPreview?.cellIndex ?? "-"} correct ${interaction.snapPreview?.isCorrect ? "yes" : "no"}`,
     `  pointerLost ${interaction.pointerLostFrames} releaseGrace ${interaction.releaseGraceFrames}`,
     `  pinchPhase ${activePinch}`,
     `  pointer ${formatPoint(interaction.pointer)}`,
@@ -114,6 +116,7 @@ function formatPuzzleLines(puzzle: PuzzleBoard | null, pinchGestures: Map<string
     `  velocity ${Math.round(interaction.pointerVelocityPxPerSec)} alpha ${interaction.pointerSmoothingAlpha.toFixed(2)}`,
     `  lag ${Math.round(interaction.pointerLagPx)}px`,
     `  snap ${interaction.lastSnapPieceId ?? "-"} dist ${interaction.snapDistancePx === null ? "-" : Math.round(interaction.snapDistancePx)}`,
+    `  previewDist ${interaction.snapPreview ? Math.round(interaction.snapPreview.distancePx) : "-"} strength ${interaction.snapPreview ? interaction.snapPreview.strength.toFixed(2) : "-"}`,
     `  locked ${getLockedPieceCount(puzzle.pieces)}/${puzzle.pieces.length}`
   ];
 }
