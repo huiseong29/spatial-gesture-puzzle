@@ -15,7 +15,7 @@ export async function createPuzzleBoardFromSnapshot(
   const shuffledIndexes = createShuffledIndexes(pieces.length);
 
   return {
-    mode: "ready",
+    mode: "transitioning",
     snapshotId: snapshot.id,
     image,
     rows: puzzleConfig.rows,
@@ -26,7 +26,8 @@ export async function createPuzzleBoardFromSnapshot(
       currentIndex: shuffledIndexes[index],
       currentRect: cellRectForIndex(shuffledIndexes[index], boardRect)
     })),
-    interaction: createInitialInteraction()
+    interaction: createInitialInteraction(),
+    transition: createInitialTransition()
   };
 }
 
@@ -191,5 +192,25 @@ function createInitialInteraction(): PuzzleInteractionState {
     snapDistancePx: null,
     nearestCellIndex: null,
     completed: false
+  };
+}
+
+function createInitialTransition() {
+  const startedAt = performance.now();
+  const completedAt =
+    startedAt +
+    puzzleConfig.transitionGridMs +
+    puzzleConfig.transitionPopMs +
+    puzzleConfig.transitionShuffleMs +
+    puzzleConfig.transitionStaggerMs * (puzzleConfig.rows * puzzleConfig.cols - 1);
+
+  return {
+    phase: "captured" as const,
+    startedAt,
+    gridDurationMs: puzzleConfig.transitionGridMs,
+    popDurationMs: puzzleConfig.transitionPopMs,
+    shuffleDurationMs: puzzleConfig.transitionShuffleMs,
+    staggerMs: puzzleConfig.transitionStaggerMs,
+    completedAt
   };
 }

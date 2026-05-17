@@ -24,6 +24,8 @@ export class PuzzleBoardManager {
     this.latestSnapshot = snapshot;
 
     if (this.board?.snapshotId === snapshot.id || this.loadingSnapshotId === snapshot.id) {
+      this.board = this.updateTransition(this.board);
+
       if (this.board?.mode === "ready") {
         this.board = updatePuzzleInteraction(this.board, hands, pinchGestures);
       }
@@ -57,6 +59,7 @@ export class PuzzleBoardManager {
         height: 0
       },
       pieces: [],
+      transition: null,
       interaction: {
         selectedPieceId: null,
         activeHandId: null,
@@ -116,5 +119,35 @@ export class PuzzleBoardManager {
     this.board = null;
     this.loadingSnapshotId = null;
     this.latestSnapshot = null;
+  }
+
+  private updateTransition(board: PuzzleBoard | null) {
+    if (!board || board.mode !== "transitioning" || !board.transition) {
+      return board;
+    }
+
+    const now = performance.now();
+    if (now >= board.transition.completedAt) {
+      return {
+        ...board,
+        mode: "ready" as const,
+        transition: {
+          ...board.transition,
+          phase: "playable" as const
+        }
+      };
+    }
+
+    const splitAt = board.transition.startedAt + board.transition.gridDurationMs;
+    const shuffleAt = splitAt + board.transition.popDurationMs;
+    const phase = now < splitAt ? "captured" as const : now < shuffleAt ? "splitting" as const : "shuffling" as const;
+
+    return {
+      ...board,
+      transition: {
+        ...board.transition,
+        phase
+      }
+    };
   }
 }

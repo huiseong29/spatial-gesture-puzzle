@@ -99,6 +99,7 @@ function formatPuzzleLines(puzzle: PuzzleBoard | null, pinchGestures: Map<string
 
   return [
     `Puzzle ${puzzle.mode}`,
+    `  transition ${puzzle.transition?.phase ?? "-"} ${formatTransitionProgress(puzzle)}`,
     `  pieces ${puzzle.pieces.length}`,
     `  board ${Math.round(puzzle.boardRect.width)} x ${Math.round(puzzle.boardRect.height)}`,
     `  completed ${interaction.completed ? "yes" : "no"}`,
@@ -115,6 +116,16 @@ function formatPuzzleLines(puzzle: PuzzleBoard | null, pinchGestures: Map<string
     `  snap ${interaction.lastSnapPieceId ?? "-"} dist ${interaction.snapDistancePx === null ? "-" : Math.round(interaction.snapDistancePx)}`,
     `  locked ${getLockedPieceCount(puzzle.pieces)}/${puzzle.pieces.length}`
   ];
+}
+
+function formatTransitionProgress(puzzle: PuzzleBoard) {
+  if (!puzzle.transition) {
+    return "-";
+  }
+
+  const duration = puzzle.transition.completedAt - puzzle.transition.startedAt;
+  const progress = Math.min(Math.max((performance.now() - puzzle.transition.startedAt) / duration, 0), 1);
+  return `${Math.round(progress * 100)}%`;
 }
 
 function formatCaptureLines(capture: CaptureState | null) {

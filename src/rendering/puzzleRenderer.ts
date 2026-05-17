@@ -1,12 +1,21 @@
 import type { PuzzleBoard } from "../puzzle/puzzleTypes";
 
 export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: PuzzleBoard | null) {
-  if (!board || (board.mode !== "ready" && board.mode !== "completed") || !board.image) {
+  if (
+    !board ||
+    (board.mode !== "transitioning" && board.mode !== "ready" && board.mode !== "completed") ||
+    !board.image
+  ) {
     return;
   }
 
   context.save();
-  renderBoardFrame(context, board);
+  const transition = getTransitionProgress(board);
+  renderBoardFrame(context, board, transition.gridOpacity);
+
+  if (board.mode === "transitioning") {
+    renderFrozenSnapshot(context, board, transition.snapshotOpacity);
+  }
 
   const selectedPiece = board.pieces.find((piece) => piece.id === board.interaction.selectedPieceId);
   const drawPieces = selectedPiece
@@ -16,8 +25,14 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
   for (const piece of drawPieces) {
     const selected = piece.id === board.interaction.selectedPieceId;
     const snapped = piece.id === board.interaction.lastSnapPieceId;
+    const displayRect = getDisplayRect(piece.correctRect, piece.currentRect, transition.pieceProgress(piece.originalIndex));
     const radius = selected ? 14 : 11;
 
+    if (transition.pieceOpacity <= 0) {
+      continue;
+    }
+
+    context.globalAlpha = transition.pieceOpacity;
     context.shadowColor = selected
       ? "rgba(239, 68, 68, 0.62)"
       : snapped || piece.locked
@@ -29,10 +44,10 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
     context.save();
     roundRect(
       context,
-      piece.currentRect.x,
-      piece.currentRect.y,
-      piece.currentRect.width,
-      piece.currentRect.height,
+      displayRect.x,
+      displayRect.y,
+      displayRect.width,
+      displayRect.height,
       radius
     );
     context.clip();
@@ -42,10 +57,10 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
       piece.sourceRect.y,
       piece.sourceRect.width,
       piece.sourceRect.height,
-      piece.currentRect.x,
-      piece.currentRect.y,
-      piece.currentRect.width,
-      piece.currentRect.height
+      displayRect.x,
+      displayRect.y,
+      displayRect.width,
+      displayRect.height
     );
     context.restore();
 
@@ -59,10 +74,10 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
     context.lineWidth = selected ? 3 : 1.5;
     roundRect(
       context,
-      piece.currentRect.x,
-      piece.currentRect.y,
-      piece.currentRect.width,
-      piece.currentRect.height,
+      displayRect.x,
+      displayRect.y,
+      displayRect.width,
+      displayRect.height,
       radius
     );
     context.stroke();
@@ -75,15 +90,16 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
       context.shadowBlur = 18;
       roundRect(
         context,
-        piece.currentRect.x - 5,
-        piece.currentRect.y - 5,
-        piece.currentRect.width + 10,
-        piece.currentRect.height + 10,
+        displayRect.x - 5,
+        displayRect.y - 5,
+        displayRect.width + 10,
+        displayRect.height + 10,
         radius + 4
       );
       context.stroke();
       context.restore();
     }
+    context.globalAlpha = 1;
   }
 
   if (board.interaction.pointer) {
@@ -103,7 +119,7 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
   context.restore();
 }
 
-function renderBoardFrame(context: CanvasRenderingContext2D, board: PuzzleBoard) {
+function renderBoardFrame(context: CanvasRenderingContext2D, board: PuzzleBoard, gridOpacity = 1) {
   const { boardRect } = board;
   context.shadowColor = "rgba(24, 10, 8, 0.44)";
   context.shadowBlur = 18;
@@ -113,13 +129,13 @@ function renderBoardFrame(context: CanvasRenderingContext2D, board: PuzzleBoard)
   context.shadowBlur = 0;
 
   context.strokeStyle = board.mode === "completed"
-    ? "rgba(254, 215, 170, 0.96)"
-    : "rgba(255, 237, 213, 0.76)";
+    ? `rgba(254, 215, 170, ${0.96 * gridOpacity})`
+    : `rgba(255, 237, 213, ${0.76 * gridOpacity})`;
   context.lineWidth = 2;
   roundRect(context, boardRect.x, boardRect.y, boardRect.width, boardRect.height, 14);
   context.stroke();
 
-  context.strokeStyle = "rgba(254, 215, 170, 0.22)";
+  context.strokeStyle = `rgba(254, 215, 170, ${0.22 * gridOpacity})`;
   context.lineWidth = 1;
 
   for (let col = 1; col < board.cols; col += 1) {
@@ -137,6 +153,30 @@ function renderBoardFrame(context: CanvasRenderingContext2D, board: PuzzleBoard)
     context.lineTo(boardRect.x + boardRect.width, y);
     context.stroke();
   }
+}
+
+function renderFrozenSnapshot(context: CanvasRenderingContext2D, board: PuzzleBoard, opacity: number) {
+  if (opacity <= 0 || !board.image) {
+    return;
+  }
+
+  const image = board.image;
+  context.save();
+  context.globalAlpha = opacity;
+  roundRect(context, board.boardRect.x, board.boardRect.y, board.boardRect.width, board.boardRect.height, 14);
+  context.clip();
+  context.drawImage(
+    image,
+    0,
+    0,
+    image.naturalWidth,
+    image.naturalHeight,
+    board.boardRect.x,
+    board.boardRect.y,
+    board.boardRect.width,
+    board.boardRect.height
+  );
+  context.restore();
 }
 
 function renderCompletionOverlay(context: CanvasRenderingContext2D, board: PuzzleBoard) {
@@ -180,4 +220,70 @@ function roundRect(
   context.quadraticCurveTo(x, y + height, x, y + height - r);
   context.lineTo(x, y + r);
   context.quadraticCurveTo(x, y, x + r, y);
+}
+
+function getTransitionProgress(board: PuzzleBoard) {
+  if (board.mode !== "transitioning" || !board.transition) {
+    return {
+      gridOpacity: 1,
+      snapshotOpacity: 0,
+      pieceOpacity: 1,
+      pieceProgress: () => 1
+    };
+  }
+
+  const now = performance.now();
+  const gridStart = board.transition.startedAt;
+  const popStart = gridStart + board.transition.gridDurationMs;
+  const shuffleStart = popStart + board.transition.popDurationMs;
+  const gridOpacity = easeOutCubic(clamp01((now - gridStart) / board.transition.gridDurationMs));
+  const popProgress = easeOutBack(clamp01((now - popStart) / board.transition.popDurationMs));
+  const snapshotOpacity = 1 - clamp01((now - shuffleStart) / 260) * 0.72;
+
+  return {
+    gridOpacity,
+    snapshotOpacity,
+    pieceOpacity: clamp01(popProgress),
+    pieceProgress: (pieceIndex: number) => {
+      const pieceStart = shuffleStart + pieceIndex * board.transition!.staggerMs;
+      return easeInOutCubic(clamp01((now - pieceStart) / board.transition!.shuffleDurationMs));
+    }
+  };
+}
+
+function getDisplayRect(from: { x: number; y: number; width: number; height: number }, to: { x: number; y: number; width: number; height: number }, progress: number) {
+  const popScale = 1 + Math.sin(progress * Math.PI) * 0.035;
+  const width = lerp(from.width, to.width, progress) * popScale;
+  const height = lerp(from.height, to.height, progress) * popScale;
+  const centerX = lerp(from.x + from.width / 2, to.x + to.width / 2, progress);
+  const centerY = lerp(from.y + from.height / 2, to.y + to.height / 2, progress);
+
+  return {
+    x: centerX - width / 2,
+    y: centerY - height / 2,
+    width,
+    height
+  };
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
+}
+
+function clamp01(value: number) {
+  return Math.min(Math.max(value, 0), 1);
+}
+
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function easeOutBack(t: number) {
+  const c1 = 1.2;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 }

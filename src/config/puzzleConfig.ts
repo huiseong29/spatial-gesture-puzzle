@@ -13,5 +13,9 @@ export const puzzleConfig = {
   activeHandReacquireRadiusPx: 80,
   dragPointerSlowAlpha: 0.18,
   dragPointerFastAlpha: 0.03,
-  dragPointerVelocityThreshold: 520
+  dragPointerVelocityThreshold: 520,
+  transitionGridMs: 360,
+  transitionPopMs: 420,
+  transitionShuffleMs: 760,
+  transitionStaggerMs: 42
 } as const;

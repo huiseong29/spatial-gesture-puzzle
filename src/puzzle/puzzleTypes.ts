@@ -1,7 +1,18 @@
 import type { Rect, ScreenPoint } from "../tracking/handTypes";
 
-export type PuzzleMode = "empty" | "loading" | "ready" | "completed";
+export type PuzzleMode = "empty" | "loading" | "transitioning" | "ready" | "completed";
 export type PuzzleDragPhase = "idle" | "grabbed" | "dragging" | "release-pending" | "pointer-lost";
+export type PuzzleTransitionPhase = "captured" | "splitting" | "shuffling" | "playable";
+
+export type PuzzleTransitionState = {
+  phase: PuzzleTransitionPhase;
+  startedAt: number;
+  gridDurationMs: number;
+  popDurationMs: number;
+  shuffleDurationMs: number;
+  staggerMs: number;
+  completedAt: number;
+};
 
 export type PuzzlePiece = {
   id: string;
@@ -49,4 +60,5 @@ export type PuzzleBoard = {
   boardRect: Rect;
   pieces: PuzzlePiece[];
   interaction: PuzzleInteractionState;
+  transition: PuzzleTransitionState | null;
 };
