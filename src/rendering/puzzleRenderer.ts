@@ -66,7 +66,7 @@ export function renderPuzzleBoard(
   }
 
   if (board.mode === "completed" && board.interaction.heatmapReplayMode === "ready") {
-    renderCompletionOverlay(context, board, completion);
+    renderCompletionOverlay(context, board, completion, tokens);
   }
 
   context.restore();
@@ -247,7 +247,8 @@ function renderImageInBoard(context: CanvasRenderingContext2D, board: PuzzleBoar
 function renderCompletionOverlay(
   context: CanvasRenderingContext2D,
   board: PuzzleBoard,
-  completion: ReturnType<typeof getCompletionProgress>
+  completion: ReturnType<typeof getCompletionProgress>,
+  tokens: ReturnType<typeof getThemeTokens>
 ) {
   const centerX = board.boardRect.x + board.boardRect.width / 2;
   const centerY = board.boardRect.y + board.boardRect.height / 2;
@@ -256,23 +257,23 @@ function renderCompletionOverlay(
 
   context.save();
   context.globalAlpha = alpha;
-  context.fillStyle = "rgba(24, 10, 8, 0.48)";
+  context.fillStyle = tokens.mode === "light" ? "rgba(255, 247, 237, 0.76)" : "rgba(24, 10, 8, 0.48)";
   roundRect(context, board.boardRect.x, board.boardRect.y, board.boardRect.width, board.boardRect.height, 14);
   context.fill();
 
-  context.shadowColor = "rgba(239, 68, 68, 0.52)";
+  context.shadowColor = tokens.tomatoGlow;
   context.shadowBlur = 18;
   context.font = "800 30px Inter, system-ui, sans-serif";
   context.textBaseline = "middle";
   context.textAlign = "center";
-  context.fillStyle = "rgba(255, 237, 213, 0.98)";
+  context.fillStyle = tokens.textPrimary;
   context.fillText("퍼즐 완성", centerX, centerY - 14);
   context.shadowBlur = 0;
   context.font = "600 15px Inter, system-ui, sans-serif";
-  context.fillStyle = "rgba(254, 215, 170, 0.92)";
+  context.fillStyle = tokens.textSecondary;
   context.fillText("잠시 후 캡처 단계로 돌아갑니다", centerX, centerY + 24);
 
-  context.strokeStyle = `rgba(239, 68, 68, ${0.44 + completion.displayProgress * 0.28})`;
+  context.strokeStyle = withAlpha(tokens.tomatoPrimary, 0.44 + completion.displayProgress * 0.28);
   context.lineWidth = 4;
   roundRect(
     context,

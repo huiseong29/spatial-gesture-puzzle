@@ -45,6 +45,8 @@
   --button-hover-text: #fff7ed;
   --tomato-button: rgba(229, 72, 72, 0.92);
   --tomato-button-soft: rgba(229, 72, 72, 0.13);
+  --analysis-surface: rgba(255, 255, 255, 0.96);
+  --analysis-border: rgba(229, 72, 72, 0.28);
 }
 
 * {
@@ -153,6 +155,21 @@ button {
 }
 
 .brand-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brand-mark {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(229, 72, 72, 0.18);
+}
+
+.brand-copy {
   display: grid;
   gap: 2px;
   min-width: 0;
@@ -266,11 +283,11 @@ button {
   gap: 10px;
   width: min(460px, 100%);
   padding: 20px 22px;
-  border: 1px solid rgba(254, 215, 170, 0.2);
+  border: 1px solid var(--analysis-border, rgba(254, 215, 170, 0.2));
   border-radius: 16px;
   color: var(--text);
   text-align: center;
-  background: var(--surface);
+  background: var(--analysis-surface, var(--surface));
   box-shadow:
     0 18px 42px var(--shadow),
     0 0 32px rgba(239, 68, 68, 0.12);
@@ -280,7 +297,7 @@ button {
 .analysis-card-replay {
   align-self: start;
   margin-top: clamp(10px, 3vh, 34px);
-  background: var(--surface);
+  background: var(--analysis-surface, var(--surface));
 }
 
 .analysis-kicker {
@@ -399,6 +416,13 @@ button {
   font-size: 18px;
   font-weight: 800;
   letter-spacing: 0.08em;
+}
+
+.start-card-icon img {
+  width: 42px;
+  height: 42px;
+  display: block;
+  filter: drop-shadow(0 6px 12px rgba(229, 72, 72, 0.2));
 }
 
 .start-card h1 {

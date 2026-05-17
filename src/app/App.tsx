@@ -31,8 +31,18 @@ function UnifiedTopBar({
   return (
     <header className="top-bar">
       <div className="brand-block">
-        <span className="eyebrow">Computer Vision · HCI Demo</span>
-        <strong>Spatial Gesture Puzzle</strong>
+        <img
+          className="brand-mark"
+          src="/favicon/favicon-32x32.png"
+          alt=""
+          width="32"
+          height="32"
+          aria-hidden="true"
+        />
+        <div className="brand-copy">
+          <span className="eyebrow">Computer Vision · HCI Demo</span>
+          <strong>Tomato Gesture Puzzle</strong>
+        </div>
       </div>
 
       <div className="top-guide" aria-live="polite">
@@ -133,12 +143,12 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
-    window.localStorage.setItem("spatial-gesture-theme", themeMode);
+    window.localStorage.setItem("tomato-gesture-theme", themeMode);
     controllerRef.current?.setThemeMode(themeMode);
   }, [themeMode]);
 
   useEffect(() => {
-    window.localStorage.setItem("spatial-gesture-sound-muted", soundMuted ? "true" : "false");
+    window.localStorage.setItem("tomato-gesture-sound-muted", soundMuted ? "true" : "false");
     controllerRef.current?.setSoundMuted(soundMuted);
   }, [soundMuted]);
 
@@ -205,7 +215,7 @@ export function App() {
             {showStartCard ? (
               <div className="start-card" aria-live="polite">
                 <span className="start-card-icon" aria-hidden="true">
-                  CV
+                  <img src="/favicon/favicon-32x32.png" alt="" width="40" height="40" />
                 </span>
                 <h1>Hand Gesture Interaction Demo</h1>
                 <p>{getInteractionInstruction(status, experienceState).instruction}</p>
@@ -282,10 +292,15 @@ export function App() {
 }
 
 function readStoredTheme(): ThemeMode {
-  const stored = window.localStorage.getItem("spatial-gesture-theme");
+  const stored =
+    window.localStorage.getItem("tomato-gesture-theme") ??
+    window.localStorage.getItem("spatial-gesture-theme");
   return stored === "light" || stored === "dark" ? stored : "light";
 }
 
 function readStoredSoundMuted() {
-  return window.localStorage.getItem("spatial-gesture-sound-muted") === "true";
+  return (
+    window.localStorage.getItem("tomato-gesture-sound-muted") ??
+    window.localStorage.getItem("spatial-gesture-sound-muted")
+  ) === "true";
 }

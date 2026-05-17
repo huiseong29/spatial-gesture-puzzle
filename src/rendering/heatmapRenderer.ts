@@ -30,21 +30,23 @@ export function renderInteractionHeatmap(
   const visibleCount = Math.max(1, Math.floor(samples.length * reveal));
   const visibleSamples = samples.slice(0, visibleCount);
   const tokens = getThemeTokens(themeMode);
+  const isLight = themeMode === "light";
 
   context.save();
-  context.fillStyle = tokens.heatmapDim;
+  context.fillStyle = isLight ? "rgba(42, 26, 20, 0.16)" : tokens.heatmapDim;
   context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-  context.globalCompositeOperation = "lighter";
+  context.globalCompositeOperation = isLight ? "source-over" : "lighter";
 
   for (let index = 0; index < visibleSamples.length; index += 1) {
     const sample = visibleSamples[index];
     const ageWeight = 0.45 + (index / visibleSamples.length) * 0.55;
-    const alpha = (sample.dragging ? puzzleConfig.heatmapDragAlpha * 1.65 : puzzleConfig.heatmapHoverAlpha * 1.4) * ageWeight * fade;
+    const themeBoost = isLight ? 1.45 : 1;
+    const alpha = (sample.dragging ? puzzleConfig.heatmapDragAlpha * 1.65 : puzzleConfig.heatmapHoverAlpha * 1.4) * ageWeight * fade * themeBoost;
     const radius = sample.dragging ? puzzleConfig.heatmapPointRadiusPx : puzzleConfig.heatmapPointRadiusPx * 0.7;
     const gradient = context.createRadialGradient(sample.x, sample.y, 0, sample.x, sample.y, radius);
 
     gradient.addColorStop(0, withAlpha(tokens.tomatoPrimary, alpha));
-    gradient.addColorStop(0.45, `rgba(251, 146, 60, ${alpha * 0.55})`);
+    gradient.addColorStop(0.45, withAlpha(isLight ? tokens.tomatoUnripe : "#fb923c", alpha * 0.58));
     gradient.addColorStop(1, "rgba(239, 68, 68, 0)");
 
     context.fillStyle = gradient;
@@ -53,7 +55,7 @@ export function renderInteractionHeatmap(
     context.fill();
   }
 
-  renderReplayTrace(context, visibleSamples, fade, tokens.cream);
+  renderReplayTrace(context, visibleSamples, fade, isLight ? tokens.textPrimary : tokens.cream, isLight);
   context.restore();
 }
 
@@ -61,7 +63,8 @@ function renderReplayTrace(
   context: CanvasRenderingContext2D,
   samples: Array<{ x: number; y: number; dragging: boolean }>,
   fade: number,
-  traceColor: string
+  traceColor: string,
+  isLight: boolean
 ) {
   if (samples.length < 2) {
     return;
@@ -70,8 +73,10 @@ function renderReplayTrace(
   context.globalCompositeOperation = "source-over";
   context.lineCap = "round";
   context.lineJoin = "round";
-  context.lineWidth = 2.4;
-  context.strokeStyle = withAlpha(traceColor, 0.42 * fade);
+  context.lineWidth = isLight ? 3 : 2.4;
+  context.strokeStyle = withAlpha(traceColor, (isLight ? 0.46 : 0.42) * fade);
+  context.shadowColor = isLight ? "rgba(229, 72, 72, 0.22)" : "rgba(255, 237, 213, 0.2)";
+  context.shadowBlur = isLight ? 5 : 3;
   context.beginPath();
 
   let started = false;
@@ -90,6 +95,7 @@ function renderReplayTrace(
   }
 
   context.stroke();
+  context.shadowBlur = 0;
 }
 
 function withAlpha(color: string, alpha: number) {

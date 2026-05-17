@@ -1,6 +1,6 @@
 <div align="center">
 
-# Spatial Gesture Puzzle
+# Tomato Gesture Puzzle
 
 ### 웹캠 기반 손 제스처로 화면 위 가상 영역을 조작하고, 선택한 영역을 실시간 이미지 스냅샷으로 캡처하는 spatial interaction system
 
@@ -22,7 +22,7 @@
 
 ## Overview
 
-**Spatial Gesture Puzzle**은 사용자의 양손을 실시간으로 추적하고, pinch gesture를 통해 화면 위의 가상 bounding box를 직접 조작하는 웹 기반 인터랙션 시스템입니다.
+**Tomato Gesture Puzzle**은 사용자의 양손을 실시간으로 추적하고, pinch gesture를 통해 화면 위의 가상 bounding box를 직접 조작하는 웹 기반 인터랙션 시스템입니다.
 
 사용자는 마우스나 터치 없이 웹캠 앞에서 손을 움직여 조작 영역을 만들고, 양손 제스처로 영역을 확정한 뒤 현재 카메라 프레임에서 해당 영역만 고해상도로 crop한 snapshot을 생성할 수 있습니다.
 
