@@ -4,19 +4,19 @@ import type { Handedness, TrackedHand } from "../tracking/handTypes";
 
 const COLORS: Record<Handedness, { line: string; point: string; accent: string }> = {
   Left: {
-    line: "rgba(45, 212, 191, 0.9)",
-    point: "rgba(153, 246, 228, 0.95)",
-    accent: "rgba(20, 184, 166, 1)"
+    line: "rgba(45, 212, 191, 0.86)",
+    point: "rgba(153, 246, 228, 0.9)",
+    accent: "rgba(20, 184, 166, 0.96)"
   },
   Right: {
-    line: "rgba(251, 146, 60, 0.9)",
-    point: "rgba(254, 215, 170, 0.95)",
-    accent: "rgba(249, 115, 22, 1)"
+    line: "rgba(96, 165, 250, 0.86)",
+    point: "rgba(191, 219, 254, 0.9)",
+    accent: "rgba(59, 130, 246, 0.96)"
   },
   Unknown: {
-    line: "rgba(203, 213, 225, 0.85)",
-    point: "rgba(226, 232, 240, 0.95)",
-    accent: "rgba(148, 163, 184, 1)"
+    line: "rgba(203, 213, 225, 0.78)",
+    point: "rgba(226, 232, 240, 0.86)",
+    accent: "rgba(148, 163, 184, 0.94)"
   }
 };
 
@@ -30,7 +30,7 @@ export function renderSkeleton(
   context.save();
   context.lineCap = "round";
   context.lineJoin = "round";
-  context.lineWidth = 4;
+  context.lineWidth = 3;
   context.strokeStyle = colors.line;
 
   for (const [from, to] of HAND_CONNECTIONS) {
@@ -52,7 +52,7 @@ export function renderSkeleton(
 
     context.beginPath();
     context.fillStyle = isAccent ? colors.accent : colors.point;
-    context.arc(point.x, point.y, isAccent ? 6 : 4, 0, Math.PI * 2);
+    context.arc(point.x, point.y, isAccent ? 5 : 3.5, 0, Math.PI * 2);
     context.fill();
   }
 
@@ -77,31 +77,31 @@ function renderPinchDebug(
   };
 
   context.save();
-  context.lineWidth = 3;
-  context.strokeStyle = pinch.isPinching ? "rgba(34, 197, 94, 0.95)" : "rgba(248, 250, 252, 0.72)";
+  context.lineWidth = 2;
+  context.strokeStyle = pinch.isPinching ? "rgba(34, 197, 94, 0.92)" : "rgba(226, 232, 240, 0.5)";
   context.beginPath();
   context.moveTo(thumbTip.x, thumbTip.y);
   context.lineTo(indexTip.x, indexTip.y);
   context.stroke();
 
-  context.fillStyle = pinch.isPinching ? "rgba(22, 163, 74, 0.92)" : "rgba(15, 23, 42, 0.74)";
+  context.fillStyle = pinch.isPinching ? "rgba(34, 197, 94, 0.9)" : "rgba(15, 23, 42, 0.68)";
   context.beginPath();
-  context.arc(midpoint.x, midpoint.y, pinch.isPinching ? 10 : 7, 0, Math.PI * 2);
+  context.arc(midpoint.x, midpoint.y, pinch.isPinching ? 8 : 6, 0, Math.PI * 2);
   context.fill();
   context.restore();
 }
 
 function renderHandLabel(context: CanvasRenderingContext2D, hand: TrackedHand) {
-  const label = `${hand.handedness} ${Math.round(hand.handednessScore * 100)}%`;
+  const label = hand.handedness === "Left" ? "Left hand" : hand.handedness === "Right" ? "Right hand" : "Hand";
   const x = hand.boundingRect.x;
   const y = Math.max(24, hand.boundingRect.y - 12);
 
-  context.font = "600 18px Inter, system-ui, sans-serif";
+  context.font = "600 14px Inter, system-ui, sans-serif";
   context.textBaseline = "middle";
   const metrics = context.measureText(label);
 
-  context.fillStyle = "rgba(15, 23, 42, 0.74)";
-  context.fillRect(x - 8, y - 16, metrics.width + 16, 32);
-  context.fillStyle = "rgba(248, 250, 252, 0.96)";
+  context.fillStyle = "rgba(15, 23, 42, 0.68)";
+  context.fillRect(x - 8, y - 14, metrics.width + 16, 28);
+  context.fillStyle = "rgba(226, 232, 240, 0.94)";
   context.fillText(label, x, y);
 }

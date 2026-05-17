@@ -5,8 +5,7 @@ import type { Rect, ScreenPoint, TrackedHand } from "../../tracking/handTypes";
 import type { VirtualBoundingBox } from "./boundingBoxTypes";
 
 type UpdateOptions = {
-  leftHand: TrackedHand | null;
-  rightHand: TrackedHand | null;
+  hands: TrackedHand[];
   pinchGestures: Map<string, PinchGestureState>;
   canvasWidth: number;
   canvasHeight: number;
@@ -24,9 +23,7 @@ export class VirtualBoundingBoxTracker {
   private box: VirtualBoundingBox | null = null;
 
   update(options: UpdateOptions): VirtualBoundingBox | null {
-    const hands = [options.leftHand, options.rightHand].filter((hand): hand is TrackedHand =>
-      Boolean(hand)
-    );
+    const hands = options.hands.slice(0, 2);
 
     if (hands.length < 2) {
       return this.updateLost(options.timestamp);

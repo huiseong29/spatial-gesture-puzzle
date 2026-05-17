@@ -1,6 +1,6 @@
 :root {
   color: #e5e7eb;
-  background: #09090b;
+  background: #050816;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -15,22 +15,44 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow: hidden;
+  background: #050816;
 }
 
-.app-shell {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+button {
+  font: inherit;
+}
+
+.experience-shell {
   width: 100vw;
   height: 100vh;
-  background: #0f172a;
+  min-height: 520px;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(37, 99, 235, 0.18), transparent 30%),
+    radial-gradient(circle at 82% 24%, rgba(20, 184, 166, 0.12), transparent 34%),
+    linear-gradient(135deg, #050816 0%, #0f172a 48%, #020617 100%);
 }
 
 .stage {
   position: relative;
-  min-width: 0;
-  min-height: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  background: #020617;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.12), rgba(2, 6, 23, 0.58)),
+    transparent;
+}
+
+.stage::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at center, black, transparent 82%);
 }
 
 .camera-video {
@@ -42,91 +64,335 @@ body {
 }
 
 .tracking-canvas {
+  position: relative;
+  z-index: 0;
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: contain;
-  background: #020617;
+  object-fit: cover;
+  background: #050816;
 }
 
-.status-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  min-width: 0;
-  padding: 28px;
-  border-left: 1px solid rgba(148, 163, 184, 0.2);
-  background: #111827;
-}
-
-.status-panel h1 {
-  margin: 0;
-  font-size: 24px;
-  line-height: 1.2;
-  font-weight: 700;
-}
-
-.status-panel dl {
+.ui-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
   display: grid;
-  gap: 16px;
-  margin: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: clamp(12px, 2vw, 22px);
+  width: min(1180px, calc(100% - clamp(24px, 5vw, 64px)));
+  height: 100%;
+  margin: 0 auto;
+  padding: clamp(14px, 2.4vw, 24px) 0 clamp(16px, 2.8vw, 28px);
+  pointer-events: none;
 }
 
-.status-panel dt {
-  margin: 0 0 4px;
-  color: #94a3b8;
-  font-size: 13px;
+.top-bar,
+.floating-controls,
+.status-chip,
+.start-card,
+.error-toast {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(14px, 2.4vw, 28px);
+  width: 100%;
+  max-width: 1020px;
+  min-height: 68px;
+  justify-self: center;
+  padding: 12px clamp(16px, 2.4vw, 22px);
+  border-radius: 14px;
+}
+
+.brand-block {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 3px;
+  min-width: 0;
+}
+
+.brand-block .eyebrow {
+  color: #38bdf8;
+  font-size: clamp(11px, 1.3vw, 12px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.status-panel dd {
-  margin: 0;
+.brand-block strong {
   color: #f8fafc;
-  font-size: 16px;
+  font-size: clamp(21px, 2.7vw, 26px);
+  line-height: 1.05;
+  white-space: nowrap;
 }
 
-.controls {
-  display: flex;
-  gap: 10px;
-}
-
-.controls button {
-  min-height: 40px;
-  padding: 0 14px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 6px;
-  color: #f8fafc;
-  background: #2563eb;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.controls button:disabled {
-  color: #94a3b8;
-  background: #1f2937;
-  cursor: not-allowed;
-}
-
-.hint {
+.top-bar p {
+  min-width: 0;
+  max-width: 640px;
   margin: 0;
   color: #cbd5e1;
-  font-size: 14px;
+  font-size: clamp(14px, 1.8vw, 16px);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.center-layer {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+
+.start-card {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: min(480px, 100%);
+  padding: clamp(24px, 4vw, 38px);
+  border-radius: 18px;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.start-card-icon {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  border-radius: 16px;
+  color: #93c5fd;
+  background: rgba(15, 23, 42, 0.82);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.start-card h1 {
+  margin: 2px 0 0;
+  color: #f8fafc;
+  font-size: clamp(26px, 4.4vw, 40px);
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.start-card p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: clamp(15px, 2vw, 17px);
+  font-weight: 600;
   line-height: 1.5;
 }
 
-@media (max-width: 860px) {
+.start-card button {
+  min-width: 140px;
+  min-height: 44px;
+  margin-top: 4px;
+  border: 1px solid rgba(96, 165, 250, 0.52);
+  border-radius: 10px;
+  color: #f8fafc;
+  background: #2563eb;
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.24);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.status-chip {
+  position: absolute;
+  top: clamp(100px, 14vh, 126px);
+  right: 0;
+  display: grid;
+  gap: 5px;
+  width: min(320px, 34vw);
+  min-width: 240px;
+  padding: 13px 15px;
+  border-radius: 14px;
+  pointer-events: none;
+}
+
+.status-chip span {
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.status-chip strong {
+  color: #f8fafc;
+  font-size: clamp(14px, 1.7vw, 16px);
+  line-height: 1.42;
+}
+
+.floating-controls {
+  display: flex;
+  justify-content: center;
+  justify-self: center;
+  gap: 8px;
+  width: min(780px, 100%);
+  padding: 8px;
+  border-radius: 14px;
+  pointer-events: auto;
+}
+
+.floating-controls button {
+  flex: 0 0 auto;
+  min-width: 112px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 10px;
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.84);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.floating-controls button:hover:not(:disabled),
+.floating-controls button.is-active {
+  color: #f8fafc;
+  border-color: rgba(96, 165, 250, 0.7);
+  background: rgba(37, 99, 235, 0.88);
+  transform: translateY(-1px);
+}
+
+.floating-controls button:disabled {
+  color: rgba(148, 163, 184, 0.52);
+  background: rgba(30, 41, 59, 0.48);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.error-toast {
+  position: absolute;
+  right: clamp(14px, 4vw, 24px);
+  bottom: clamp(96px, 15vh, 118px);
+  z-index: 4;
+  max-width: min(400px, calc(100% - 28px));
+  padding: 14px 16px;
+  border-color: rgba(248, 113, 113, 0.46);
+  border-radius: 14px;
+  color: #fecaca;
+  font-weight: 700;
+}
+
+@media (max-width: 980px) {
+  .ui-layer {
+    width: min(100% - 32px, 860px);
+  }
+
+  .top-bar {
+    align-items: flex-start;
+    max-width: none;
+  }
+
+  .status-chip {
+    top: 98px;
+    width: min(320px, 42vw);
+  }
+
+  .floating-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(132px, 1fr));
+    max-width: 640px;
+  }
+
+  .floating-controls button {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 760px) {
   body {
     overflow: auto;
   }
 
-  .app-shell {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(360px, 1fr) auto;
+  .experience-shell {
+    min-height: 100svh;
   }
 
-  .status-panel {
-    border-left: 0;
-    border-top: 1px solid rgba(148, 163, 184, 0.2);
+  .ui-layer {
+    display: flex;
+    flex-direction: column;
+    width: calc(100% - 24px);
+    min-height: 100svh;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .top-bar {
+    order: 0;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    padding: 13px 15px;
+  }
+
+  .brand-block strong {
+    white-space: normal;
+  }
+
+  .top-bar p {
+    font-size: 14px;
+  }
+
+  .status-chip {
+    position: static;
+    order: 2;
+    align-self: stretch;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .center-layer {
+    order: 1;
+    flex: 1 1 auto;
+    min-height: 260px;
+  }
+
+  .floating-controls {
+    order: 3;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    max-width: none;
+    padding: 8px;
+  }
+
+  .floating-controls button {
+    min-height: 42px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .start-card {
+    align-self: center;
+    width: min(440px, 100%);
+    padding: 24px 18px;
+  }
+}
+
+@media (max-width: 340px) {
+  .ui-layer {
+    width: calc(100% - 18px);
+  }
+
+  .floating-controls {
+    grid-template-columns: 1fr;
   }
 }

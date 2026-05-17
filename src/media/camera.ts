@@ -1,8 +1,8 @@
 export async function createCameraStream() {
   return navigator.mediaDevices.getUserMedia({
     video: {
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
+      width: { ideal: 960 },
+      height: { ideal: 540 },
       facingMode: "user"
     },
     audio: false

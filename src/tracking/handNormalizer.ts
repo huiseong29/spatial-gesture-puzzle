@@ -34,10 +34,18 @@ export function normalizeHandResults(options: NormalizeHandResultsOptions): Trac
 
   return {
     timestamp: options.timestamp,
+    profile: options.previousFrame?.profile ?? {
+      detectMs: 0,
+      normalizeMs: 0,
+      interactionMs: 0,
+      renderMs: 0,
+      totalMs: 0
+    },
     hands,
     pinchGestures: options.previousFrame?.pinchGestures ?? new Map(),
     virtualBoundingBox: options.previousFrame?.virtualBoundingBox ?? null,
     capture: options.previousFrame?.capture ?? null,
+    puzzle: options.previousFrame?.puzzle ?? null,
     leftHand: hands.find((hand) => hand.handedness === "Left") ?? null,
     rightHand: hands.find((hand) => hand.handedness === "Right") ?? null,
     rawVideoSize: {

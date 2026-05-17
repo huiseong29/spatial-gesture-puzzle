@@ -2,14 +2,19 @@ import type { TrackedHand } from "../tracking/handTypes";
 import type { PinchGestureState } from "../interaction/gestures/pinchTypes";
 import type { VirtualBoundingBox } from "../interaction/boundingBox/boundingBoxTypes";
 import type { CaptureState } from "../capture/snapshotTypes";
+import type { PuzzleBoard } from "../puzzle/puzzleTypes";
+import { getLockedPieceCount } from "../puzzle/puzzleCompletion";
+import type { FrameProfile } from "../tracking/handTypes";
 
-type DebugOverlayOptions = {
+export type DebugOverlayOptions = {
   fps: number;
+  profile: FrameProfile | null;
   handCount: number;
   hands: TrackedHand[];
   pinchGestures: Map<string, PinchGestureState>;
   virtualBoundingBox: VirtualBoundingBox | null;
   capture: CaptureState | null;
+  puzzle: PuzzleBoard | null;
 };
 
 export function renderDebugOverlay(context: CanvasRenderingContext2D, options: DebugOverlayOptions) {
@@ -27,9 +32,11 @@ export function renderDebugOverlay(context: CanvasRenderingContext2D, options: D
 
   const lines = [
     `FPS ${options.fps}`,
+    ...formatProfileLines(options.profile),
     `Hands ${options.handCount}/2`,
     ...boxLines,
     ...formatCaptureLines(options.capture),
+    ...formatPuzzleLines(options.puzzle, options.pinchGestures),
     ...options.hands.flatMap((hand) => {
       const pinch = options.pinchGestures.get(hand.id);
 
@@ -61,6 +68,46 @@ export function renderDebugOverlay(context: CanvasRenderingContext2D, options: D
   });
 
   context.restore();
+}
+
+function formatProfileLines(profile: FrameProfile | null) {
+  if (!profile) {
+    return ["Profile -"];
+  }
+
+  return [
+    `ms detect ${profile.detectMs.toFixed(1)} render ${profile.renderMs.toFixed(1)} total ${profile.totalMs.toFixed(1)}`,
+    `ms normalize ${profile.normalizeMs.toFixed(1)} interaction ${profile.interactionMs.toFixed(1)}`
+  ];
+}
+
+function formatPuzzleLines(puzzle: PuzzleBoard | null, pinchGestures: Map<string, PinchGestureState>) {
+  if (!puzzle) {
+    return ["Puzzle empty"];
+  }
+
+  const interaction = puzzle.interaction;
+  const activePinch = interaction.activeHandId
+    ? pinchGestures.get(interaction.activeHandId)?.phase ?? "missing"
+    : "-";
+
+  return [
+    `Puzzle ${puzzle.mode}`,
+    `  pieces ${puzzle.pieces.length}`,
+    `  board ${Math.round(puzzle.boardRect.width)} x ${Math.round(puzzle.boardRect.height)}`,
+    `  completed ${interaction.completed ? "yes" : "no"}`,
+    `  dragPhase ${interaction.dragPhase}`,
+    `  selected ${interaction.selectedPieceId ?? "-"} activeHand ${interaction.activeHandId ?? "-"}`,
+    `  hover ${interaction.hoveredPieceId ?? "-"}`,
+    `  pointerLost ${interaction.pointerLostFrames} releaseGrace ${interaction.releaseGraceFrames}`,
+    `  pinchPhase ${activePinch}`,
+    `  pointer ${formatPoint(interaction.pointer)}`,
+    `  raw ${formatPoint(interaction.rawPointer)} smooth ${formatPoint(interaction.smoothedPointer)}`,
+    `  velocity ${Math.round(interaction.pointerVelocityPxPerSec)} alpha ${interaction.pointerSmoothingAlpha.toFixed(2)}`,
+    `  lag ${Math.round(interaction.pointerLagPx)}px`,
+    `  snap ${interaction.lastSnapPieceId ?? "-"} dist ${interaction.snapDistancePx === null ? "-" : Math.round(interaction.snapDistancePx)}`,
+    `  locked ${getLockedPieceCount(puzzle.pieces)}/${puzzle.pieces.length}`
+  ];
 }
 
 function formatCaptureLines(capture: CaptureState | null) {

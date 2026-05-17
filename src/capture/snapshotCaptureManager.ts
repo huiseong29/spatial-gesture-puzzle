@@ -89,6 +89,10 @@ export class SnapshotCaptureManager {
     this.lastPinchStartAtByHand.clear();
   }
 
+  clearSnapshot() {
+    this.state = createInitialState();
+  }
+
   private recordPinchStarts(gestures: Map<string, PinchGestureState>, timestamp: number) {
     for (const gesture of gestures.values()) {
       if (gesture.startedThisFrame) {
@@ -121,29 +125,30 @@ function getSimultaneousPinchStart(
   lastPinchStartAtByHand: Map<string, number>,
   timestamp: number
 ) {
-  const leftId = frame.leftHand?.id;
-  const rightId = frame.rightHand?.id;
+  const [handA, handB] = frame.hands;
+  const firstId = handA?.id;
+  const secondId = handB?.id;
 
-  if (!leftId || !rightId) {
+  if (!firstId || !secondId) {
     return {
       matched: false,
       deltaMs: null
     };
   }
 
-  const leftStartedAt = lastPinchStartAtByHand.get(leftId);
-  const rightStartedAt = lastPinchStartAtByHand.get(rightId);
+  const firstStartedAt = lastPinchStartAtByHand.get(firstId);
+  const secondStartedAt = lastPinchStartAtByHand.get(secondId);
 
-  if (leftStartedAt === undefined || rightStartedAt === undefined) {
+  if (firstStartedAt === undefined || secondStartedAt === undefined) {
     return {
       matched: false,
       deltaMs: null
     };
   }
 
-  const deltaMs = Math.abs(leftStartedAt - rightStartedAt);
+  const deltaMs = Math.abs(firstStartedAt - secondStartedAt);
   const recentEnough =
-    timestamp - Math.max(leftStartedAt, rightStartedAt) <= captureConfig.simultaneousThresholdMs;
+    timestamp - Math.max(firstStartedAt, secondStartedAt) <= captureConfig.simultaneousThresholdMs;
 
   return {
     matched: deltaMs <= captureConfig.simultaneousThresholdMs && recentEnough,
