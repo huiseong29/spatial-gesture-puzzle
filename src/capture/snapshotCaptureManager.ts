@@ -64,7 +64,9 @@ export class SnapshotCaptureManager {
       canvasWidth: options.frame.canvasSize.width,
       canvasHeight: options.frame.canvasSize.height,
       cropRectCanvas: box.confirmedRect,
-      timestamp: options.timestamp
+      timestamp: options.timestamp,
+      gestureConfidence: calculateGestureConfidence(options.frame),
+      trackingJitterPx: calculateTrackingJitter(options.frame)
     });
 
     if (!snapshot) {
@@ -210,4 +212,41 @@ function getCaptureBlockReason(frame: TrackingFrame): CaptureFailureReason {
 
   const gestures = [...frame.pinchGestures.values()];
   return gestures.filter((gesture) => gesture.isPinching).length >= 2 ? "none" : "not-ready";
+}
+
+function calculateGestureConfidence(frame: TrackingFrame) {
+  const hands = frame.hands.filter((hand) => hand.trackingState === "stable");
+  const gestures = [...frame.pinchGestures.values()].filter((gesture) => gesture.isPinching);
+
+  if (hands.length === 0 || gestures.length === 0) {
+    return 0;
+  }
+
+  const trackingQuality = average(hands.map((hand) => hand.trackingQuality));
+  const pinchQuality = average(
+    gestures.map((gesture) => {
+      const normalized = gesture.normalizedDistance / Math.max(gesture.releaseThreshold, 0.001);
+      return 1 - clamp(normalized, 0, 1);
+    })
+  );
+
+  return clamp(trackingQuality * 0.65 + pinchQuality * 0.35, 0, 1);
+}
+
+function calculateTrackingJitter(frame: TrackingFrame) {
+  const hands = frame.hands.filter((hand) => hand.trackingState === "stable");
+
+  if (hands.length === 0) {
+    return 0;
+  }
+
+  return average(hands.map((hand) => hand.jumpDistancePx));
+}
+
+function average(values: number[]) {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }

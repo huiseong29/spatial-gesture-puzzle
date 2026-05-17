@@ -3,7 +3,7 @@ import { puzzleConfig } from "../config/puzzleConfig";
 import type { PinchGestureState } from "../interaction/gestures/pinchTypes";
 import type { TrackedHand } from "../tracking/handTypes";
 import { createPuzzleBoardFromSnapshot } from "./puzzleGenerator";
-import type { PuzzleBoard } from "./puzzleTypes";
+import type { DifficultyState, PuzzleBoard } from "./puzzleTypes";
 import { updatePuzzleInteraction } from "./puzzleInteraction";
 
 export class PuzzleBoardManager {
@@ -11,6 +11,7 @@ export class PuzzleBoardManager {
   private loadingSnapshotId: string | null = null;
   private latestSnapshot: Snapshot | null = null;
   private autoResetRequested = false;
+  private lastDifficulty: DifficultyState | null = null;
 
   updateFromSnapshot(
     snapshot: Snapshot | null,
@@ -27,11 +28,7 @@ export class PuzzleBoardManager {
 
     if (this.board?.snapshotId === snapshot.id || this.loadingSnapshotId === snapshot.id) {
       this.board = this.updateTransition(this.board);
-      this.board = this.updateCompletionAutoReset(this.board);
-
-      if (this.autoResetRequested) {
-        return null;
-      }
+      this.board = this.updateHeatmapReplay(this.board);
 
       if (this.board?.mode === "ready") {
         this.board = updatePuzzleInteraction(this.board, hands, pinchGestures);
@@ -40,10 +37,11 @@ export class PuzzleBoardManager {
     }
 
     this.loadingSnapshotId = snapshot.id;
-    void createPuzzleBoardFromSnapshot(snapshot, canvasWidth, canvasHeight)
+    void createPuzzleBoardFromSnapshot(snapshot, canvasWidth, canvasHeight, this.lastDifficulty)
       .then((board) => {
         if (this.loadingSnapshotId === snapshot.id) {
           this.board = board;
+          this.lastDifficulty = board.difficulty;
           this.loadingSnapshotId = null;
         }
       })
@@ -53,12 +51,14 @@ export class PuzzleBoardManager {
         }
       });
 
+    const fallbackDifficulty = createFallbackDifficulty(snapshot, canvasWidth, canvasHeight, this.lastDifficulty);
+
     return this.board ?? {
       mode: "loading",
       snapshotId: snapshot.id,
       image: null,
-      rows: 3,
-      cols: 3,
+      rows: fallbackDifficulty.gridSize,
+      cols: fallbackDifficulty.gridSize,
       boardRect: {
         x: 0,
         y: 0,
@@ -67,6 +67,7 @@ export class PuzzleBoardManager {
       },
       pieces: [],
       transition: null,
+      difficulty: fallbackDifficulty,
       interaction: {
         selectedPieceId: null,
         activeHandId: null,
@@ -92,7 +93,13 @@ export class PuzzleBoardManager {
         snapDistancePx: null,
         nearestCellIndex: null,
         completed: false,
-        completedAt: 0
+        completedAt: 0,
+        heatmapReplayMode: "hidden",
+        heatmapReplayStartedAt: 0,
+        pointerHistory: {
+          samples: [],
+          maxSamples: puzzleConfig.pointerHistoryMaxSamples
+        }
       }
     };
   }
@@ -113,10 +120,11 @@ export class PuzzleBoardManager {
     this.loadingSnapshotId = snapshot.id;
     this.autoResetRequested = false;
 
-    void createPuzzleBoardFromSnapshot(snapshot, canvasWidth, canvasHeight)
+    void createPuzzleBoardFromSnapshot(snapshot, canvasWidth, canvasHeight, this.lastDifficulty)
       .then((board) => {
         if (this.loadingSnapshotId === snapshot.id) {
           this.board = board;
+          this.lastDifficulty = board.difficulty;
           this.loadingSnapshotId = null;
         }
       })
@@ -132,12 +140,28 @@ export class PuzzleBoardManager {
     this.loadingSnapshotId = null;
     this.latestSnapshot = null;
     this.autoResetRequested = false;
+    this.lastDifficulty = null;
   }
 
   consumeAutoResetRequested() {
     const requested = this.autoResetRequested;
     this.autoResetRequested = false;
     return requested;
+  }
+
+  startHeatmapReplay() {
+    if (!this.board || this.board.mode !== "completed") {
+      return;
+    }
+
+    this.board = {
+      ...this.board,
+      interaction: {
+        ...this.board.interaction,
+        heatmapReplayMode: "playing" as const,
+        heatmapReplayStartedAt: performance.now()
+      }
+    };
   }
 
   private updateTransition(board: PuzzleBoard | null) {
@@ -170,24 +194,42 @@ export class PuzzleBoardManager {
     };
   }
 
-  private updateCompletionAutoReset(board: PuzzleBoard | null) {
-    if (!board || board.mode !== "completed" || !board.interaction.completedAt) {
+  private updateHeatmapReplay(board: PuzzleBoard | null) {
+    if (!board || board.mode !== "completed" || board.interaction.heatmapReplayMode !== "playing") {
       return board;
     }
 
-    const resetAt =
-      board.interaction.completedAt +
-      puzzleConfig.completionDisplayMs +
-      puzzleConfig.autoResetFadeMs;
-
-    if (performance.now() < resetAt) {
+    if (performance.now() - board.interaction.heatmapReplayStartedAt < puzzleConfig.heatmapReplayMs) {
       return board;
     }
 
-    this.board = null;
-    this.loadingSnapshotId = null;
-    this.latestSnapshot = null;
-    this.autoResetRequested = true;
-    return null;
+    return {
+      ...board,
+      interaction: {
+        ...board.interaction,
+        heatmapReplayMode: "finished" as const
+      }
+    };
   }
+}
+
+function createFallbackDifficulty(
+  snapshot: Snapshot,
+  canvasWidth: number,
+  canvasHeight: number,
+  previous: DifficultyState | null
+): DifficultyState {
+  const captureAreaRatio = (snapshot.cropRectCanvas.width * snapshot.cropRectCanvas.height) /
+    Math.max(canvasWidth * canvasHeight, 1);
+  const score = previous?.smoothedScore ?? 3;
+
+  return {
+    gridSize: Math.round(score),
+    score,
+    smoothedScore: score,
+    captureAreaRatio,
+    gestureConfidence: snapshot.gestureConfidence,
+    trackingJitterPx: snapshot.trackingJitterPx,
+    reason: "medium-capture"
+  };
 }

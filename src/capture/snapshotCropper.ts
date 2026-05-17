@@ -8,6 +8,8 @@ type CaptureSnapshotOptions = {
   canvasHeight: number;
   cropRectCanvas: Rect;
   timestamp: number;
+  gestureConfidence: number;
+  trackingJitterPx: number;
 };
 
 export function captureSnapshot(options: CaptureSnapshotOptions): Snapshot | null {
@@ -45,6 +47,8 @@ export function captureSnapshot(options: CaptureSnapshotOptions): Snapshot | nul
     height,
     cropRectCanvas: { ...options.cropRectCanvas },
     cropRectVideo,
+    gestureConfidence: options.gestureConfidence,
+    trackingJitterPx: options.trackingJitterPx
   };
 }
 

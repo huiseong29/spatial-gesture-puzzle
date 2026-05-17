@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { HandTrackingController, type RuntimeStatus } from "./HandTrackingController";
+import { HandTrackingController, type ExperienceState, type RuntimeStatus } from "./HandTrackingController";
 
 function modeToKoreanInstruction(status: RuntimeStatus) {
   if (status.phase === "idle") {
@@ -20,7 +20,7 @@ function modeToKoreanInstruction(status: RuntimeStatus) {
 
   if (status.phase === "running") {
     if (status.message === "Puzzle restarted") {
-      return "퍼즐을 다시 셔플했습니다";
+      return "퍼즐을 다시 섞었습니다";
     }
 
     if (status.message === "Ready for new capture") {
@@ -94,6 +94,14 @@ function UnifiedTopBar({ status, debugEnabled, onStart, onToggleDebug }: Unified
   );
 }
 
+function createInitialExperienceState(): ExperienceState {
+  return {
+    puzzleMode: null,
+    heatmapReplayMode: "hidden",
+    pointerHistoryCount: 0
+  };
+}
+
 export function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -102,8 +110,18 @@ export function App() {
     phase: "idle",
     message: "카메라를 시작하세요"
   });
+  const [experienceState, setExperienceState] = useState<ExperienceState>(createInitialExperienceState);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const showStartCard = status.phase !== "running";
+  const showAnalysisButton =
+    status.phase === "running" &&
+    experienceState.puzzleMode === "completed" &&
+    experienceState.heatmapReplayMode === "ready" &&
+    experienceState.pointerHistoryCount > 0;
+  const showReplayPanel =
+    status.phase === "running" &&
+    experienceState.puzzleMode === "completed" &&
+    (experienceState.heatmapReplayMode === "playing" || experienceState.heatmapReplayMode === "finished");
 
   useEffect(() => {
     if (!videoRef.current || !canvasRef.current) {
@@ -113,7 +131,8 @@ export function App() {
     const controller = new HandTrackingController({
       video: videoRef.current,
       canvas: canvasRef.current,
-      onStatus: setStatus
+      onStatus: setStatus,
+      onExperienceState: setExperienceState
     });
 
     controllerRef.current = controller;
@@ -130,6 +149,7 @@ export function App() {
 
   const stopCamera = () => {
     controllerRef.current?.stop();
+    setExperienceState(createInitialExperienceState());
   };
 
   const restartPuzzle = () => {
@@ -138,6 +158,15 @@ export function App() {
 
   const retakeSnapshot = () => {
     controllerRef.current?.retakeSnapshot();
+    setExperienceState(createInitialExperienceState());
+  };
+
+  const startInteractionReplay = () => {
+    controllerRef.current?.startInteractionReplay();
+    setExperienceState((current) => ({
+      ...current,
+      heatmapReplayMode: "playing"
+    }));
   };
 
   const toggleDebug = () => {
@@ -171,6 +200,40 @@ export function App() {
                 <button type="button" onClick={startCamera} disabled={status.phase === "camera-permission"}>
                   카메라 시작
                 </button>
+              </div>
+            ) : null}
+
+            {showAnalysisButton ? (
+              <div className="analysis-card" aria-live="polite">
+                <span className="analysis-kicker">Interaction Analysis</span>
+                <h2>퍼즐 완성</h2>
+                <p>손 이동 경로와 머문 영역을 heatmap replay로 확인할 수 있습니다.</p>
+                <div className="analysis-actions">
+                  <button type="button" onClick={startInteractionReplay}>
+                    인터랙션 분석 보기
+                  </button>
+                  <button type="button" onClick={retakeSnapshot}>
+                    다시 촬영하기
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {showReplayPanel ? (
+              <div className="analysis-card analysis-card-replay" aria-live="polite">
+                <span className="analysis-kicker">Interaction Replay</span>
+                <h2>손 이동 분석</h2>
+                <p>밝은 영역은 손동작이 집중된 위치이고, 연한 선은 퍼즐 조작 경로를 나타냅니다.</p>
+                {experienceState.heatmapReplayMode === "finished" ? (
+                  <div className="analysis-actions">
+                    <button type="button" onClick={startInteractionReplay}>
+                      다시 보기
+                    </button>
+                    <button type="button" onClick={retakeSnapshot}>
+                      다시 촬영하기
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

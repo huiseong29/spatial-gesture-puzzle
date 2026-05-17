@@ -100,8 +100,12 @@ function formatPuzzleLines(puzzle: PuzzleBoard | null, pinchGestures: Map<string
   return [
     `Puzzle ${puzzle.mode}`,
     `  transition ${puzzle.transition?.phase ?? "-"} ${formatTransitionProgress(puzzle)}`,
+    `  difficulty ${puzzle.difficulty.gridSize}x${puzzle.difficulty.gridSize} ${puzzle.difficulty.reason}`,
+    `  confidence ${puzzle.difficulty.gestureConfidence.toFixed(2)} jitter ${Math.round(puzzle.difficulty.trackingJitterPx)}px area ${(puzzle.difficulty.captureAreaRatio * 100).toFixed(1)}%`,
     `  pieces ${puzzle.pieces.length}`,
     `  lockedPieces ${getLockedPieceCount(puzzle.pieces)}/${puzzle.pieces.length}`,
+    `  pointerHistory ${puzzle.interaction.pointerHistory.samples.length}/${puzzle.interaction.pointerHistory.maxSamples}`,
+    `  replay ${puzzle.interaction.heatmapReplayMode}`,
     `  board ${Math.round(puzzle.boardRect.width)} x ${Math.round(puzzle.boardRect.height)}`,
     `  completed ${interaction.completed ? "yes" : "no"}`,
     `  dragPhase ${interaction.dragPhase}`,

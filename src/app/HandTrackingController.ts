@@ -23,10 +23,17 @@ export type RuntimeStatus = {
   message: string;
 };
 
+export type ExperienceState = {
+  puzzleMode: string | null;
+  heatmapReplayMode: "hidden" | "ready" | "playing" | "finished";
+  pointerHistoryCount: number;
+};
+
 type HandTrackingControllerOptions = {
   video: HTMLVideoElement;
   canvas: HTMLCanvasElement;
   onStatus: (status: RuntimeStatus) => void;
+  onExperienceState?: (state: ExperienceState) => void;
 };
 
 export class HandTrackingController {
@@ -34,6 +41,8 @@ export class HandTrackingController {
   private readonly canvas: HTMLCanvasElement;
   private readonly renderer: CanvasRenderer;
   private readonly onStatus: (status: RuntimeStatus) => void;
+  private readonly onExperienceState?: (state: ExperienceState) => void;
+  private lastExperienceStateKey = "";
   private handLandmarker: HandLandmarker | null = null;
   private stream: MediaStream | null = null;
   private animationFrameId = 0;
@@ -53,6 +62,7 @@ export class HandTrackingController {
     this.video = options.video;
     this.canvas = options.canvas;
     this.onStatus = options.onStatus;
+    this.onExperienceState = options.onExperienceState;
     this.renderer = new CanvasRenderer(this.canvas);
   }
 
@@ -98,6 +108,7 @@ export class HandTrackingController {
     this.virtualBoundingBoxTracker.reset();
     this.snapshotCaptureManager.reset();
     this.puzzleBoardManager.reset();
+    this.publishExperienceState(null);
   }
 
   restartPuzzle() {
@@ -124,6 +135,12 @@ export class HandTrackingController {
         }
       : null;
     this.setStatus("running", "Ready for new capture");
+    this.publishExperienceState(null);
+  }
+
+  startInteractionReplay() {
+    this.puzzleBoardManager.startHeatmapReplay();
+    this.publishExperienceState(this.lastFrame);
   }
 
   setDebugEnabled(enabled: boolean) {
@@ -197,6 +214,7 @@ export class HandTrackingController {
         frame.puzzle = null;
         frame.virtualBoundingBox = null;
       }
+      this.publishExperienceState(frame);
       const interactionEnd = performance.now();
       frame.profile = {
         detectMs: detectEnd - detectStart,
@@ -253,6 +271,27 @@ export class HandTrackingController {
 
   private setStatus(phase: RuntimePhase, message: string) {
     this.onStatus({ phase, message });
+  }
+
+  private publishExperienceState(frame: TrackingFrame | null) {
+    if (!this.onExperienceState) {
+      return;
+    }
+
+    const puzzle = frame?.puzzle ?? null;
+    const state: ExperienceState = {
+      puzzleMode: puzzle?.mode ?? null,
+      heatmapReplayMode: puzzle?.interaction.heatmapReplayMode ?? "hidden",
+      pointerHistoryCount: puzzle?.interaction.pointerHistory.samples.length ?? 0
+    };
+    const key = `${state.puzzleMode}:${state.heatmapReplayMode}:${state.pointerHistoryCount > 0 ? "has-history" : "empty"}`;
+
+    if (key === this.lastExperienceStateKey) {
+      return;
+    }
+
+    this.lastExperienceStateKey = key;
+    this.onExperienceState(state);
   }
 }
 

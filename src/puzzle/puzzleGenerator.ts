@@ -1,33 +1,36 @@
 import { puzzleConfig } from "../config/puzzleConfig";
 import type { Snapshot } from "../capture/snapshotTypes";
 import type { Rect } from "../tracking/handTypes";
-import type { PuzzleBoard, PuzzleInteractionState, PuzzlePiece } from "./puzzleTypes";
+import type { DifficultyState, PuzzleBoard, PuzzleInteractionState, PuzzlePiece } from "./puzzleTypes";
 
 export async function createPuzzleBoardFromSnapshot(
   snapshot: Snapshot,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
+  previousDifficulty: DifficultyState | null = null
 ): Promise<PuzzleBoard> {
   const image = await loadSnapshotImage(snapshot.dataUrl);
   const boardRect = computeBoardRect(snapshot, canvasWidth, canvasHeight);
+  const difficulty = calculateDifficulty(snapshot, canvasWidth, canvasHeight, previousDifficulty);
   const sourceArea = computeSourceArea(snapshot, boardRect);
-  const pieces = createPieces(sourceArea, boardRect);
+  const pieces = createPieces(sourceArea, boardRect, difficulty.gridSize, difficulty.gridSize);
   const shuffledIndexes = createShuffledIndexes(pieces.length);
 
   return {
     mode: "transitioning",
     snapshotId: snapshot.id,
     image,
-    rows: puzzleConfig.rows,
-    cols: puzzleConfig.cols,
+    rows: difficulty.gridSize,
+    cols: difficulty.gridSize,
     boardRect,
     pieces: pieces.map((piece, index) => ({
       ...piece,
       currentIndex: shuffledIndexes[index],
-      currentRect: cellRectForIndex(shuffledIndexes[index], boardRect)
+      currentRect: cellRectForIndex(shuffledIndexes[index], boardRect, difficulty.gridSize, difficulty.gridSize)
     })),
     interaction: createInitialInteraction(),
-    transition: createInitialTransition()
+    transition: createInitialTransition(difficulty.gridSize),
+    difficulty
   };
 }
 
@@ -76,15 +79,15 @@ function computeSourceArea(snapshot: Snapshot, boardRect: Rect): Rect {
   };
 }
 
-function createPieces(sourceArea: Rect, boardRect: Rect): PuzzlePiece[] {
-  const sourceCellWidth = sourceArea.width / puzzleConfig.cols;
-  const sourceCellHeight = sourceArea.height / puzzleConfig.rows;
+function createPieces(sourceArea: Rect, boardRect: Rect, rows: number, cols: number): PuzzlePiece[] {
+  const sourceCellWidth = sourceArea.width / cols;
+  const sourceCellHeight = sourceArea.height / rows;
   const pieces: PuzzlePiece[] = [];
 
-  for (let row = 0; row < puzzleConfig.rows; row += 1) {
-    for (let col = 0; col < puzzleConfig.cols; col += 1) {
-      const originalIndex = row * puzzleConfig.cols + col;
-      const correctRect = cellRectForIndex(originalIndex, boardRect);
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const originalIndex = row * cols + col;
+      const correctRect = cellRectForIndex(originalIndex, boardRect, rows, cols);
 
       pieces.push({
         id: `piece-${originalIndex}`,
@@ -108,12 +111,12 @@ function createPieces(sourceArea: Rect, boardRect: Rect): PuzzlePiece[] {
   return pieces;
 }
 
-function cellRectForIndex(index: number, boardRect: Rect): Rect {
-  const row = Math.floor(index / puzzleConfig.cols);
-  const col = index % puzzleConfig.cols;
+function cellRectForIndex(index: number, boardRect: Rect, rows: number, cols: number): Rect {
+  const row = Math.floor(index / cols);
+  const col = index % cols;
   const gap = puzzleConfig.pieceGap;
-  const cellWidth = boardRect.width / puzzleConfig.cols;
-  const cellHeight = boardRect.height / puzzleConfig.rows;
+  const cellWidth = boardRect.width / cols;
+  const cellHeight = boardRect.height / rows;
 
   return {
     x: boardRect.x + col * cellWidth + gap,
@@ -194,18 +197,24 @@ function createInitialInteraction(): PuzzleInteractionState {
     snapDistancePx: null,
     nearestCellIndex: null,
     completed: false,
-    completedAt: 0
+    completedAt: 0,
+    heatmapReplayMode: "hidden",
+    heatmapReplayStartedAt: 0,
+    pointerHistory: {
+      samples: [],
+      maxSamples: puzzleConfig.pointerHistoryMaxSamples
+    }
   };
 }
 
-function createInitialTransition() {
+function createInitialTransition(gridSize: number) {
   const startedAt = performance.now();
   const completedAt =
     startedAt +
     puzzleConfig.transitionGridMs +
     puzzleConfig.transitionPopMs +
     puzzleConfig.transitionShuffleMs +
-    puzzleConfig.transitionStaggerMs * (puzzleConfig.rows * puzzleConfig.cols - 1);
+    puzzleConfig.transitionStaggerMs * (gridSize * gridSize - 1);
 
   return {
     phase: "captured" as const,
@@ -216,4 +225,53 @@ function createInitialTransition() {
     staggerMs: puzzleConfig.transitionStaggerMs,
     completedAt
   };
+}
+
+function calculateDifficulty(
+  snapshot: Snapshot,
+  canvasWidth: number,
+  canvasHeight: number,
+  previous: DifficultyState | null
+): DifficultyState {
+  const captureAreaRatio = (snapshot.cropRectCanvas.width * snapshot.cropRectCanvas.height) /
+    Math.max(canvasWidth * canvasHeight, 1);
+  let score = getCaptureAreaScore(captureAreaRatio);
+  let reason: DifficultyState["reason"] =
+    score <= 2 ? "small-capture" : score >= 4 ? "large-capture" : "medium-capture";
+
+  if (snapshot.trackingJitterPx >= puzzleConfig.highJitterPx || snapshot.gestureConfidence <= puzzleConfig.lowGestureConfidence) {
+    score -= 1;
+    reason = "low-stability";
+  } else if (snapshot.gestureConfidence >= puzzleConfig.highGestureConfidence) {
+    score += 0.5;
+    reason = "high-confidence";
+  }
+
+  score = clamp(score, puzzleConfig.minGridSize, puzzleConfig.maxGridSize);
+  const smoothedScore = previous
+    ? previous.smoothedScore * puzzleConfig.difficultySmoothingAlpha + score * (1 - puzzleConfig.difficultySmoothingAlpha)
+    : score;
+  const gridSize = Math.round(clamp(smoothedScore, puzzleConfig.minGridSize, puzzleConfig.maxGridSize));
+
+  return {
+    gridSize,
+    score,
+    smoothedScore,
+    captureAreaRatio,
+    gestureConfidence: snapshot.gestureConfidence,
+    trackingJitterPx: snapshot.trackingJitterPx,
+    reason
+  };
+}
+
+function getCaptureAreaScore(areaRatio: number) {
+  if (areaRatio < puzzleConfig.smallCaptureAreaRatio) {
+    return 2;
+  }
+
+  if (areaRatio > puzzleConfig.largeCaptureAreaRatio) {
+    return 4;
+  }
+
+  return 3;
 }

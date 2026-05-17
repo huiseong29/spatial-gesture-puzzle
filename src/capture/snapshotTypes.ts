@@ -18,6 +18,8 @@ export type Snapshot = {
   height: number;
   cropRectCanvas: Rect;
   cropRectVideo: Rect;
+  gestureConfidence: number;
+  trackingJitterPx: number;
 };
 
 export type CaptureState = {

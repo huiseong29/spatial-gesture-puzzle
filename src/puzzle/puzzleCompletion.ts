@@ -10,6 +10,7 @@ export function isPuzzleCompleted(pieces: PuzzlePiece[]) {
 
 export function withCompletionState(board: PuzzleBoard): PuzzleBoard {
   const completed = isPuzzleCompleted(board.pieces);
+  const newlyCompleted = completed && !board.interaction.completed;
   const completedAt = completed && !board.interaction.completed
     ? performance.now()
     : board.interaction.completedAt;
@@ -20,7 +21,8 @@ export function withCompletionState(board: PuzzleBoard): PuzzleBoard {
     interaction: {
       ...board.interaction,
       completed,
-      completedAt
+      completedAt,
+      heatmapReplayMode: newlyCompleted ? "ready" : board.interaction.heatmapReplayMode
     }
   };
 }

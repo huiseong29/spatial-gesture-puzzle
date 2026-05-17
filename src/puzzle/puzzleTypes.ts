@@ -3,6 +3,7 @@ import type { Rect, ScreenPoint } from "../tracking/handTypes";
 export type PuzzleMode = "empty" | "loading" | "transitioning" | "ready" | "completed";
 export type PuzzleDragPhase = "idle" | "grabbed" | "dragging" | "release-pending" | "pointer-lost";
 export type PuzzleTransitionPhase = "captured" | "splitting" | "shuffling" | "playable";
+export type HeatmapReplayMode = "hidden" | "ready" | "playing" | "finished";
 
 export type PuzzleTransitionState = {
   phase: PuzzleTransitionPhase;
@@ -21,6 +22,29 @@ export type SnapPreview = {
   isCorrect: boolean;
   strength: number;
 } | null;
+
+export type DifficultyState = {
+  gridSize: number;
+  score: number;
+  smoothedScore: number;
+  captureAreaRatio: number;
+  gestureConfidence: number;
+  trackingJitterPx: number;
+  reason: "small-capture" | "medium-capture" | "large-capture" | "low-stability" | "high-confidence";
+};
+
+export type PointerHistorySample = {
+  x: number;
+  y: number;
+  t: number;
+  dragging: boolean;
+  pieceId: string | null;
+};
+
+export type PointerHistory = {
+  samples: PointerHistorySample[];
+  maxSamples: number;
+};
 
 export type PuzzlePiece = {
   id: string;
@@ -60,6 +84,9 @@ export type PuzzleInteractionState = {
   nearestCellIndex: number | null;
   completed: boolean;
   completedAt: number;
+  heatmapReplayMode: HeatmapReplayMode;
+  heatmapReplayStartedAt: number;
+  pointerHistory: PointerHistory;
 };
 
 export type PuzzleBoard = {
@@ -72,4 +99,5 @@ export type PuzzleBoard = {
   pieces: PuzzlePiece[];
   interaction: PuzzleInteractionState;
   transition: PuzzleTransitionState | null;
+  difficulty: DifficultyState;
 };

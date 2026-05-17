@@ -2,7 +2,14 @@ import { pinchConfig } from "../config/gestureConfig";
 import { puzzleConfig } from "../config/puzzleConfig";
 import type { PinchGestureState } from "../interaction/gestures/pinchTypes";
 import type { Rect, ScreenPoint, TrackedHand } from "../tracking/handTypes";
-import type { PuzzleBoard, PuzzleDragPhase, PuzzleInteractionState, PuzzlePiece, SnapPreview } from "./puzzleTypes";
+import type {
+  PointerHistory,
+  PuzzleBoard,
+  PuzzleDragPhase,
+  PuzzleInteractionState,
+  PuzzlePiece,
+  SnapPreview
+} from "./puzzleTypes";
 import { withCompletionState } from "./puzzleCompletion";
 
 export function updatePuzzleInteraction(
@@ -41,7 +48,13 @@ export function updatePuzzleInteraction(
     lastSnapAt: board.interaction.lastSnapAt,
     snapPreview: null,
     nearestCellIndex: getSelectedNearestCellIndex(board, pieces, board.interaction.selectedPieceId),
-    snapDistancePx: getSelectedSnapDistance(pieces, board.interaction.selectedPieceId)
+    snapDistancePx: getSelectedSnapDistance(pieces, board.interaction.selectedPieceId),
+    pointerHistory: appendPointerHistory(
+      board.interaction.pointerHistory,
+      pointer,
+      hasSelection,
+      board.interaction.selectedPieceId
+    )
   };
 
   if (!interaction.selectedPieceId) {
@@ -623,4 +636,40 @@ function clamp(value: number, min: number, max: number) {
 
 function resolveDragPhase(selectedPieceId: string | null, currentPhase: PuzzleDragPhase): PuzzleDragPhase {
   return selectedPieceId ? currentPhase : "idle";
+}
+
+function appendPointerHistory(
+  history: PointerHistory,
+  pointer: ScreenPoint | null,
+  dragging: boolean,
+  pieceId: string | null
+): PointerHistory {
+  if (!pointer) {
+    return history;
+  }
+
+  const last = history.samples.at(-1);
+  if (last && distance(last, pointer) < puzzleConfig.pointerHistoryMinDistancePx && last.dragging === dragging) {
+    return history;
+  }
+
+  const nextSamples = [
+    ...history.samples,
+    {
+      x: pointer.x,
+      y: pointer.y,
+      t: performance.now(),
+      dragging,
+      pieceId
+    }
+  ];
+
+  if (nextSamples.length > history.maxSamples) {
+    nextSamples.splice(0, nextSamples.length - history.maxSamples);
+  }
+
+  return {
+    ...history,
+    samples: nextSamples
+  };
 }

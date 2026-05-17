@@ -1,5 +1,6 @@
 import { puzzleConfig } from "../config/puzzleConfig";
 import type { PuzzleBoard } from "../puzzle/puzzleTypes";
+import { renderInteractionHeatmap } from "./heatmapRenderer";
 
 export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: PuzzleBoard | null) {
   if (
@@ -86,6 +87,8 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
     renderMergedImage(context, board, completion.mergeOpacity);
   }
 
+  renderInteractionHeatmap(context, board);
+
   if (board.interaction.pointer && board.mode !== "completed") {
     context.fillStyle = "rgba(239, 68, 68, 0.95)";
     context.shadowColor = "rgba(239, 68, 68, 0.52)";
@@ -96,7 +99,7 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
     context.shadowBlur = 0;
   }
 
-  if (board.mode === "completed") {
+  if (board.mode === "completed" && board.interaction.heatmapReplayMode === "ready") {
     renderCompletionOverlay(context, board, completion);
   }
 
