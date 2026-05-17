@@ -14,16 +14,17 @@ export function updatePuzzleInteraction(
     return board;
   }
 
+  const hasSelection = Boolean(board.interaction.selectedPieceId);
   const activeHand = selectActiveHand(board, hands, pinchGestures);
   const activeGesture = activeHand ? pinchGestures.get(activeHand.id) : undefined;
   const rawPointer = activeHand ? getPointer(activeHand) : null;
-  const hasSelection = Boolean(board.interaction.selectedPieceId);
   const pointerLostFrames = hasSelection && !rawPointer ? board.interaction.pointerLostFrames + 1 : 0;
   const dragPointer = resolveDragPointer(board, rawPointer, hasSelection);
   const pointer = dragPointer.pointer;
   let pieces = board.pieces.map((piece) => ({ ...piece }));
   let interaction: PuzzleInteractionState = {
     ...board.interaction,
+    activeHandId: hasSelection ? board.interaction.activeHandId : board.interaction.activeHandId,
     pointer,
     rawPointer,
     smoothedPointer: dragPointer.pointer,
@@ -31,8 +32,9 @@ export function updatePuzzleInteraction(
     pointerSmoothingAlpha: dragPointer.alpha,
     pointerLagPx: dragPointer.lagDistancePx,
     pointerLostFrames,
-    hoveredPieceId: !hasSelection && pointer ? hitTestPiece(pieces, pointer, puzzleConfig.hitPaddingPx)?.id ?? null : null,
+    hoveredPieceId: !hasSelection && pointer ? hitTestPieceForgiving(pieces, pointer)?.id ?? null : null,
     lastSnapPieceId: null,
+    nearestCellIndex: getSelectedNearestCellIndex(board, pieces, board.interaction.selectedPieceId),
     snapDistancePx: getSelectedSnapDistance(pieces, board.interaction.selectedPieceId)
   };
 
@@ -47,8 +49,16 @@ export function updatePuzzleInteraction(
     });
   }
 
-  if (interaction.activeHandId && activeHand?.id !== interaction.activeHandId) {
-    return handleLockedDragWithoutActiveHand(board, pieces, interaction);
+  if (activeHand && interaction.activeHandId !== activeHand.id) {
+    interaction = {
+      ...interaction,
+      activeHandId: activeHand.id,
+      pointerLostFrames: 0
+    };
+  }
+
+  if (!activeHand || !rawPointer) {
+    return handleLockedDragWithoutActivePointer(board, pieces, interaction);
   }
 
   return handleActiveDrag({
@@ -69,9 +79,12 @@ function handleIdleInteraction(options: {
   pointer: ScreenPoint | null;
 }) {
   let { pieces, interaction } = options;
+  const grabWindowFrames = getNextGrabWindowFrames(interaction.grabWindowFrames, options.activeGesture);
+  const canGrab =
+    Boolean(options.activeHand && options.pointer && options.activeGesture?.isPinching) && grabWindowFrames > 0;
 
-  if (options.activeHand && options.pointer && options.activeGesture?.startedThisFrame) {
-    const hitPiece = hitTestPiece(pieces, options.pointer, puzzleConfig.hitPaddingPx);
+  if (canGrab && options.activeHand && options.pointer) {
+    const hitPiece = hitTestPieceForgiving(pieces, options.pointer);
 
     if (hitPiece && !hitPiece.locked) {
       interaction = {
@@ -79,12 +92,15 @@ function handleIdleInteraction(options: {
         selectedPieceId: hitPiece.id,
         activeHandId: options.activeHand.id,
         dragPhase: "grabbed",
+        grabWindowFrames: 0,
         pointerLostFrames: 0,
         releaseGraceFrames: 0,
         dragOffset: {
           x: options.pointer.x - hitPiece.currentRect.x,
           y: options.pointer.y - hitPiece.currentRect.y
         },
+        originCellIndex: hitPiece.currentIndex,
+        nearestCellIndex: hitPiece.currentIndex,
         snapDistancePx: rectDistance(hitPiece.currentRect, hitPiece.correctRect)
       };
     }
@@ -96,14 +112,16 @@ function handleIdleInteraction(options: {
     interaction: {
       ...interaction,
       dragPhase: resolveDragPhase(interaction.selectedPieceId, interaction.dragPhase),
-      activeHandId: interaction.selectedPieceId ? interaction.activeHandId : null,
+      activeHandId: interaction.selectedPieceId || grabWindowFrames > 0 ? interaction.activeHandId ?? options.activeHand?.id ?? null : null,
+      grabWindowFrames: interaction.selectedPieceId ? 0 : grabWindowFrames,
       releaseGraceFrames: interaction.selectedPieceId ? interaction.releaseGraceFrames : 0,
-      pointerLostFrames: interaction.selectedPieceId ? interaction.pointerLostFrames : 0
+      pointerLostFrames: interaction.selectedPieceId ? interaction.pointerLostFrames : 0,
+      originCellIndex: interaction.selectedPieceId ? interaction.originCellIndex : null
     }
   });
 }
 
-function handleLockedDragWithoutActiveHand(
+function handleLockedDragWithoutActivePointer(
   board: PuzzleBoard,
   pieces: PuzzlePiece[],
   interaction: PuzzleInteractionState
@@ -151,14 +169,16 @@ function handleActiveDrag(options: {
   }
 
   const selectedPiece = pieces.find((piece) => piece.id === selectedPieceId);
-  const releaseGraceFrames = options.gesture?.isPinching === false || options.gesture?.releasedThisFrame
+  const releaseGraceFrames = !options.gesture || !options.gesture.isPinching || options.gesture.releasedThisFrame
     ? interaction.releaseGraceFrames + 1
     : 0;
+  const nearestCellIndex = selectedPiece ? findNearestDroppableCellIndex(options.board, pieces, selectedPiece) : null;
   const snapDistancePx = selectedPiece ? rectDistance(selectedPiece.currentRect, selectedPiece.correctRect) : null;
 
   interaction = {
     ...interaction,
     releaseGraceFrames,
+    nearestCellIndex,
     snapDistancePx,
     dragPhase: releaseGraceFrames > 0 ? "release-pending" : "dragging"
   };
@@ -166,7 +186,7 @@ function handleActiveDrag(options: {
   if (interaction.pointerLostFrames > puzzleConfig.pointerLostToleranceFrames) {
     return dropAndUnlock(options.board, pieces, {
       ...interaction,
-      dragPhase: "pointer-lost" as const
+      dragPhase: "pointer-lost"
     });
   }
 
@@ -190,7 +210,7 @@ function dropAndUnlock(board: PuzzleBoard, pieces: PuzzlePiece[], interaction: P
     };
   }
 
-  const dropResult = dropSelectedPiece(pieces, interaction.selectedPieceId);
+  const dropResult = dropSelectedPiece(board, pieces, interaction.selectedPieceId, interaction.originCellIndex);
 
   return withCompletionState({
     ...board,
@@ -200,13 +220,16 @@ function dropAndUnlock(board: PuzzleBoard, pieces: PuzzlePiece[], interaction: P
       selectedPieceId: null,
       activeHandId: null,
       dragPhase: "idle",
+      grabWindowFrames: 0,
       pointerLostFrames: 0,
       releaseGraceFrames: 0,
       dragOffset: {
         x: 0,
         y: 0
       },
+      originCellIndex: null,
       lastSnapPieceId: dropResult.snappedPieceId,
+      nearestCellIndex: dropResult.nearestCellIndex,
       snapDistancePx: dropResult.snapDistancePx
     }
   });
@@ -217,8 +240,23 @@ function selectActiveHand(
   hands: TrackedHand[],
   pinchGestures: Map<string, PinchGestureState>
 ) {
-  if (board.interaction.activeHandId) {
-    return hands.find((hand) => hand.id === board.interaction.activeHandId) ?? null;
+  const { interaction } = board;
+
+  if (interaction.selectedPieceId && interaction.activeHandId) {
+    const exact = hands.find((hand) => hand.id === interaction.activeHandId);
+    if (exact) {
+      return exact;
+    }
+
+    return null;
+  }
+
+  if (interaction.activeHandId && interaction.grabWindowFrames > 0) {
+    const windowHand = hands.find((hand) => hand.id === interaction.activeHandId);
+    const windowGesture = windowHand ? pinchGestures.get(windowHand.id) : undefined;
+    if (windowHand && windowGesture?.isPinching) {
+      return windowHand;
+    }
   }
 
   return (
@@ -230,8 +268,9 @@ function selectActiveHand(
 }
 
 function getPointer(hand: TrackedHand): ScreenPoint {
-  const thumbTip = hand.points[pinchConfig.thumbTipIndex];
-  const indexTip = hand.points[pinchConfig.indexTipIndex];
+  const pointerPoints = hand.rawPoints.length > 0 ? hand.rawPoints : hand.points;
+  const thumbTip = pointerPoints[pinchConfig.thumbTipIndex];
+  const indexTip = pointerPoints[pinchConfig.indexTipIndex];
 
   return {
     x: (thumbTip.x + indexTip.x) / 2,
@@ -273,6 +312,16 @@ function adaptiveSmoothPointer(previous: ScreenPoint | null, current: ScreenPoin
   }
 
   const velocityPxPerSec = distance(previous, current) * 60;
+
+  if (velocityPxPerSec >= puzzleConfig.dragPointerVelocityThreshold) {
+    return {
+      pointer: current,
+      velocityPxPerSec,
+      alpha: 0,
+      lagDistancePx: 0
+    };
+  }
+
   const t = clamp(velocityPxPerSec / puzzleConfig.dragPointerVelocityThreshold, 0, 1);
   const alpha = lerp(puzzleConfig.dragPointerSlowAlpha, puzzleConfig.dragPointerFastAlpha, t);
   const pointer = {
@@ -289,10 +338,40 @@ function adaptiveSmoothPointer(previous: ScreenPoint | null, current: ScreenPoin
   };
 }
 
-function hitTestPiece(pieces: PuzzlePiece[], pointer: ScreenPoint, paddingPx: number) {
-  return [...pieces]
-    .reverse()
-    .find((piece) => !piece.locked && containsPoint(expandRect(piece.currentRect, paddingPx), pointer));
+function getNextGrabWindowFrames(currentFrames: number, gesture: PinchGestureState | undefined) {
+  if (gesture?.startedThisFrame) {
+    return puzzleConfig.grabStartWindowFrames;
+  }
+
+  if (gesture?.isPinching) {
+    return Math.max(0, currentFrames - 1);
+  }
+
+  return 0;
+}
+
+function hitTestPieceForgiving(pieces: PuzzlePiece[], pointer: ScreenPoint) {
+  let bestPiece: PuzzlePiece | null = null;
+  let bestDistance = Infinity;
+
+  for (const piece of [...pieces].reverse()) {
+    if (piece.locked) {
+      continue;
+    }
+
+    const center = rectCenter(piece.currentRect);
+    const centerDistance = distance(center, pointer);
+    const radius = Math.max(piece.currentRect.width, piece.currentRect.height) * puzzleConfig.centerGrabRadiusRatio;
+    const paddedHit = containsPoint(expandRect(piece.currentRect, puzzleConfig.hitPaddingPx), pointer);
+    const centerHit = centerDistance <= radius;
+
+    if ((paddedHit || centerHit) && centerDistance < bestDistance) {
+      bestPiece = piece;
+      bestDistance = centerDistance;
+    }
+  }
+
+  return bestPiece;
 }
 
 function moveSelectedPiece(pieces: PuzzlePiece[], pieceId: string, position: { x: number; y: number }) {
@@ -310,24 +389,56 @@ function moveSelectedPiece(pieces: PuzzlePiece[], pieceId: string, position: { x
   );
 }
 
-function dropSelectedPiece(pieces: PuzzlePiece[], pieceId: string) {
-  let snappedPieceId: string | null = null;
-  let snapDistancePx: number | null = null;
+function dropSelectedPiece(
+  board: PuzzleBoard,
+  pieces: PuzzlePiece[],
+  pieceId: string,
+  originCellIndex: number | null
+) {
+  const selectedPiece = pieces.find((piece) => piece.id === pieceId);
+
+  if (!selectedPiece) {
+    return {
+      pieces,
+      snappedPieceId: null,
+      nearestCellIndex: null,
+      snapDistancePx: null
+    };
+  }
+
+  const nearestCellIndex = findNearestDroppableCellIndex(board, pieces, selectedPiece);
+  const targetCellIndex = nearestCellIndex ?? originCellIndex ?? selectedPiece.currentIndex;
+  const targetCellRect = cellRectForIndex(targetCellIndex, board.boardRect, board.rows, board.cols);
+  const occupier = pieces.find(
+    (piece) => piece.id !== pieceId && !piece.locked && piece.currentIndex === targetCellIndex
+  );
+  const snapDistancePx = rectDistance(targetCellRect, selectedPiece.correctRect);
+  const shouldLock = targetCellIndex === selectedPiece.originalIndex || snapDistancePx <= puzzleConfig.snapThresholdPx;
+  let snappedPieceId: string | null = shouldLock ? selectedPiece.id : null;
 
   const nextPieces = pieces.map((piece) => {
-    if (piece.id !== pieceId) {
-      return piece;
-    }
-
-    snapDistancePx = rectDistance(piece.currentRect, piece.correctRect);
-
-    if (snapDistancePx <= puzzleConfig.snapThresholdPx) {
-      snappedPieceId = piece.id;
+    if (piece.id === pieceId) {
       return {
         ...piece,
-        currentRect: { ...piece.correctRect },
-        currentIndex: piece.originalIndex,
-        locked: true
+        currentIndex: shouldLock ? piece.originalIndex : targetCellIndex,
+        currentRect: shouldLock ? { ...piece.correctRect } : targetCellRect,
+        locked: shouldLock
+      };
+    }
+
+    if (occupier && piece.id === occupier.id && originCellIndex !== null) {
+      const originRect = cellRectForIndex(originCellIndex, board.boardRect, board.rows, board.cols);
+      const occupierLocks = originCellIndex === piece.originalIndex;
+
+      if (occupierLocks) {
+        snappedPieceId = snappedPieceId ?? piece.id;
+      }
+
+      return {
+        ...piece,
+        currentIndex: originCellIndex,
+        currentRect: occupierLocks ? { ...piece.correctRect } : originRect,
+        locked: occupierLocks
       };
     }
 
@@ -337,8 +448,44 @@ function dropSelectedPiece(pieces: PuzzlePiece[], pieceId: string) {
   return {
     pieces: nextPieces,
     snappedPieceId,
+    nearestCellIndex: targetCellIndex,
     snapDistancePx
   };
+}
+
+function findNearestDroppableCellIndex(board: PuzzleBoard, pieces: PuzzlePiece[], selectedPiece: PuzzlePiece) {
+  const center = rectCenter(selectedPiece.currentRect);
+  let bestIndex: number | null = null;
+  let bestDistance = Infinity;
+
+  for (let index = 0; index < board.rows * board.cols; index += 1) {
+    if (isLockedCell(pieces, index, selectedPiece.id)) {
+      continue;
+    }
+
+    const cellCenter = rectCenter(cellRectForIndex(index, board.boardRect, board.rows, board.cols));
+    const cellDistance = distance(center, cellCenter);
+
+    if (cellDistance < bestDistance) {
+      bestIndex = index;
+      bestDistance = cellDistance;
+    }
+  }
+
+  return bestIndex;
+}
+
+function isLockedCell(pieces: PuzzlePiece[], cellIndex: number, selectedPieceId: string) {
+  return pieces.some((piece) => piece.id !== selectedPieceId && piece.locked && piece.currentIndex === cellIndex);
+}
+
+function getSelectedNearestCellIndex(board: PuzzleBoard, pieces: PuzzlePiece[], selectedPieceId: string | null) {
+  if (!selectedPieceId) {
+    return null;
+  }
+
+  const selectedPiece = pieces.find((piece) => piece.id === selectedPieceId);
+  return selectedPiece ? findNearestDroppableCellIndex(board, pieces, selectedPiece) : null;
 }
 
 function getSelectedSnapDistance(pieces: PuzzlePiece[], selectedPieceId: string | null) {
@@ -348,6 +495,21 @@ function getSelectedSnapDistance(pieces: PuzzlePiece[], selectedPieceId: string 
 
   const selectedPiece = pieces.find((piece) => piece.id === selectedPieceId);
   return selectedPiece ? rectDistance(selectedPiece.currentRect, selectedPiece.correctRect) : null;
+}
+
+function cellRectForIndex(index: number, boardRect: Rect, rows: number, cols: number): Rect {
+  const row = Math.floor(index / cols);
+  const col = index % cols;
+  const gap = puzzleConfig.pieceGap;
+  const cellWidth = boardRect.width / cols;
+  const cellHeight = boardRect.height / rows;
+
+  return {
+    x: boardRect.x + col * cellWidth + gap,
+    y: boardRect.y + row * cellHeight + gap,
+    width: cellWidth - gap * 2,
+    height: cellHeight - gap * 2
+  };
 }
 
 function containsPoint(rect: Rect, point: ScreenPoint) {
@@ -368,11 +530,18 @@ function expandRect(rect: Rect, paddingPx: number): Rect {
   };
 }
 
+function rectCenter(rect: Rect) {
+  return {
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height / 2
+  };
+}
+
 function rectDistance(a: Rect, b: Rect) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-function distance(a: ScreenPoint, b: ScreenPoint) {
+function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 

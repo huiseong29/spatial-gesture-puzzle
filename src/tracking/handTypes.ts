@@ -23,8 +23,16 @@ export type TrackedHand = {
   id: string;
   handedness: Handedness;
   handednessScore: number;
+  trackingState: "warming" | "stable" | "frozen";
+  trackingQuality: number;
+  stableFrameCount: number;
+  lostFrameCount: number;
+  rejectedFrameCount: number;
+  jumpDistancePx: number;
+  rejectedReason: "low-score" | "jump-outlier" | "lost" | null;
   rawLandmarks: NormalizedLandmark[];
   smoothedLandmarks: NormalizedLandmark[];
+  rawPoints: ScreenPoint[];
   points: ScreenPoint[];
   center: ScreenPoint;
   boundingRect: Rect;

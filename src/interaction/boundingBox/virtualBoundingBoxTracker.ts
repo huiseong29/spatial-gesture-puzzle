@@ -23,7 +23,7 @@ export class VirtualBoundingBoxTracker {
   private box: VirtualBoundingBox | null = null;
 
   update(options: UpdateOptions): VirtualBoundingBox | null {
-    const hands = options.hands.slice(0, 2);
+    const hands = options.hands.filter((hand) => hand.trackingState === "stable").slice(0, 2);
 
     if (hands.length < 2) {
       return this.updateLost(options.timestamp);

@@ -6,9 +6,12 @@ export const puzzleConfig = {
   shuffleAttempts: 8,
   snapThresholdPx: 34,
   hitPaddingPx: 20,
+  grabStartWindowFrames: 4,
+  centerGrabRadiusRatio: 0.65,
   dragReleaseGraceFrames: 4,
   pointerLostToleranceFrames: 5,
-  dragPointerSlowAlpha: 0.52,
-  dragPointerFastAlpha: 0.18,
-  dragPointerVelocityThreshold: 900
+  activeHandReacquireRadiusPx: 80,
+  dragPointerSlowAlpha: 0.18,
+  dragPointerFastAlpha: 0.03,
+  dragPointerVelocityThreshold: 520
 } as const;

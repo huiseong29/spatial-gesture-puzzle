@@ -1,6 +1,19 @@
 :root {
-  color: #e5e7eb;
-  background: #050816;
+  --bg-deep: #170f0d;
+  --bg-warm: #241411;
+  --surface: rgba(36, 20, 17, 0.82);
+  --surface-soft: rgba(48, 28, 22, 0.74);
+  --tomato: #ef4444;
+  --tomato-soft: #fb7185;
+  --tomato-deep: #b91c1c;
+  --cream: #ffedd5;
+  --cream-soft: #fed7aa;
+  --text: #fff7ed;
+  --muted: #f1c7a6;
+  --line: rgba(254, 215, 170, 0.2);
+  --shadow: rgba(24, 10, 8, 0.34);
+  color: var(--text);
+  background: var(--bg-deep);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -15,7 +28,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow: hidden;
-  background: #050816;
+  background: var(--bg-deep);
 }
 
 button {
@@ -27,9 +40,9 @@ button {
   height: 100vh;
   min-height: 520px;
   background:
-    radial-gradient(circle at 18% 14%, rgba(37, 99, 235, 0.18), transparent 30%),
-    radial-gradient(circle at 82% 24%, rgba(20, 184, 166, 0.12), transparent 34%),
-    linear-gradient(135deg, #050816 0%, #0f172a 48%, #020617 100%);
+    radial-gradient(circle at 16% 16%, rgba(239, 68, 68, 0.16), transparent 28%),
+    radial-gradient(circle at 86% 24%, rgba(251, 146, 60, 0.12), transparent 34%),
+    linear-gradient(135deg, var(--bg-deep) 0%, var(--bg-warm) 52%, #100907 100%);
 }
 
 .stage {
@@ -38,7 +51,7 @@ button {
   height: 100%;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.12), rgba(2, 6, 23, 0.58)),
+    linear-gradient(180deg, rgba(36, 20, 17, 0.08), rgba(16, 9, 7, 0.48)),
     transparent;
 }
 
@@ -49,10 +62,10 @@ button {
   pointer-events: none;
   content: "";
   background:
-    linear-gradient(rgba(148, 163, 184, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px);
+    linear-gradient(rgba(254, 215, 170, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(254, 215, 170, 0.026) 1px, transparent 1px);
   background-size: 72px 72px;
-  mask-image: radial-gradient(circle at center, black, transparent 82%);
+  mask-image: radial-gradient(circle at center, black, transparent 84%);
 }
 
 .camera-video {
@@ -71,6 +84,7 @@ button {
   display: block;
   object-fit: cover;
   background: #050816;
+  background: var(--bg-deep);
 }
 
 .ui-layer {
@@ -79,68 +93,153 @@ button {
   z-index: 3;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: clamp(12px, 2vw, 22px);
-  width: min(1180px, calc(100% - clamp(24px, 5vw, 64px)));
+  gap: clamp(10px, 1.8vw, 18px);
+  width: min(1240px, calc(100% - clamp(24px, 5vw, 64px)));
   height: 100%;
   margin: 0 auto;
-  padding: clamp(14px, 2.4vw, 24px) 0 clamp(16px, 2.8vw, 28px);
+  padding: clamp(12px, 2vw, 20px) 0 clamp(14px, 2.6vw, 24px);
   pointer-events: none;
 }
 
 .top-bar,
 .floating-controls,
-.status-chip,
 .start-card,
 .error-toast {
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  background: rgba(15, 23, 42, 0.72);
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 12px 34px var(--shadow);
+  backdrop-filter: blur(4px);
 }
 
 .top-bar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(210px, 0.75fr) minmax(280px, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: clamp(14px, 2.4vw, 28px);
+  gap: clamp(14px, 2vw, 24px);
   width: 100%;
-  max-width: 1020px;
-  min-height: 68px;
-  justify-self: center;
-  padding: 12px clamp(16px, 2.4vw, 22px);
-  border-radius: 14px;
+  min-height: 58px;
+  padding: 9px 12px 9px 18px;
+  border-radius: 12px;
+  pointer-events: auto;
 }
 
 .brand-block {
   display: grid;
-  flex: 0 0 auto;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
 .brand-block .eyebrow {
-  color: #38bdf8;
-  font-size: clamp(11px, 1.3vw, 12px);
+  color: var(--tomato-soft);
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .brand-block strong {
-  color: #f8fafc;
-  font-size: clamp(21px, 2.7vw, 26px);
+  overflow: hidden;
+  color: var(--text);
+  font-size: clamp(18px, 2.2vw, 22px);
   line-height: 1.05;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.top-bar p {
+.top-guide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
-  max-width: 640px;
+  gap: 10px;
+}
+
+.top-guide p {
+  min-width: 0;
   margin: 0;
-  color: #cbd5e1;
-  font-size: clamp(14px, 1.8vw, 16px);
+  overflow: hidden;
+  color: var(--muted);
+  font-size: clamp(13px, 1.5vw, 15px);
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mode-pill {
+  flex: 0 0 auto;
+  min-width: 70px;
+  padding: 5px 9px;
+  border: 1px solid rgba(239, 68, 68, 0.34);
+  border-radius: 999px;
+  color: var(--cream);
+  background: rgba(239, 68, 68, 0.16);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.mode-error {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.3);
+}
+
+.mode-running {
+  border-color: rgba(239, 68, 68, 0.42);
+  color: var(--cream);
+  background: rgba(185, 28, 28, 0.24);
+}
+
+.top-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.compact-action,
+.floating-controls button,
+.start-card button {
+  border: 1px solid rgba(254, 215, 170, 0.22);
+  border-radius: 10px;
+  color: var(--cream);
+  background: var(--surface-soft);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    transform 140ms ease,
+    background 160ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.compact-action {
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.compact-action:hover:not(:disabled),
+.compact-action.is-active,
+.floating-controls button:hover:not(:disabled),
+.floating-controls button.is-active,
+.start-card button:hover:not(:disabled) {
+  color: #f8fafc;
+  border-color: rgba(239, 68, 68, 0.78);
+  background: rgba(185, 28, 28, 0.9);
+  box-shadow: 0 8px 22px rgba(239, 68, 68, 0.22);
+  transform: translateY(-1px);
+}
+
+.compact-action:disabled,
+.floating-controls button:disabled,
+.start-card button:disabled {
+  color: rgba(254, 215, 170, 0.42);
+  background: rgba(48, 28, 22, 0.44);
+  cursor: not-allowed;
+  transform: none;
 }
 
 .center-layer {
@@ -153,10 +252,10 @@ button {
 .start-card {
   display: grid;
   justify-items: center;
-  gap: 14px;
+  gap: 13px;
   width: min(480px, 100%);
   padding: clamp(24px, 4vw, 38px);
-  border-radius: 18px;
+  border-radius: 16px;
   text-align: center;
   pointer-events: auto;
 }
@@ -166,10 +265,10 @@ button {
   place-items: center;
   width: 62px;
   height: 62px;
-  border: 1px solid rgba(96, 165, 250, 0.45);
-  border-radius: 16px;
-  color: #93c5fd;
-  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(239, 68, 68, 0.46);
+  border-radius: 14px;
+  color: var(--cream);
+  background: rgba(185, 28, 28, 0.18);
   font-size: 18px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -177,7 +276,7 @@ button {
 
 .start-card h1 {
   margin: 2px 0 0;
-  color: #f8fafc;
+  color: var(--text);
   font-size: clamp(26px, 4.4vw, 40px);
   line-height: 1.08;
   text-wrap: balance;
@@ -185,7 +284,7 @@ button {
 
 .start-card p {
   margin: 0;
-  color: #cbd5e1;
+  color: var(--muted);
   font-size: clamp(15px, 2vw, 17px);
   font-weight: 600;
   line-height: 1.5;
@@ -193,43 +292,12 @@ button {
 
 .start-card button {
   min-width: 140px;
-  min-height: 44px;
+  min-height: 42px;
   margin-top: 4px;
-  border: 1px solid rgba(96, 165, 250, 0.52);
-  border-radius: 10px;
+  padding: 0 18px;
   color: #f8fafc;
-  background: #2563eb;
-  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.24);
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.status-chip {
-  position: absolute;
-  top: clamp(100px, 14vh, 126px);
-  right: 0;
-  display: grid;
-  gap: 5px;
-  width: min(320px, 34vw);
-  min-width: 240px;
-  padding: 13px 15px;
-  border-radius: 14px;
-  pointer-events: none;
-}
-
-.status-chip span {
-  color: #38bdf8;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.status-chip strong {
-  color: #f8fafc;
-  font-size: clamp(14px, 1.7vw, 16px);
-  line-height: 1.42;
+  background: var(--tomato-deep);
+  box-shadow: 0 10px 26px rgba(239, 68, 68, 0.24);
 }
 
 .floating-controls {
@@ -237,84 +305,44 @@ button {
   justify-content: center;
   justify-self: center;
   gap: 8px;
-  width: min(780px, 100%);
-  padding: 8px;
-  border-radius: 14px;
+  width: min(440px, 100%);
+  padding: 7px;
+  border-radius: 12px;
   pointer-events: auto;
 }
 
 .floating-controls button {
-  flex: 0 0 auto;
+  flex: 1 1 0;
   min-width: 112px;
-  min-height: 40px;
-  padding: 0 16px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: 10px;
-  color: #e2e8f0;
-  background: rgba(30, 41, 59, 0.84);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
-  transition:
-    transform 140ms ease,
-    background 140ms ease,
-    border-color 140ms ease,
-    color 140ms ease;
-}
-
-.floating-controls button:hover:not(:disabled),
-.floating-controls button.is-active {
-  color: #f8fafc;
-  border-color: rgba(96, 165, 250, 0.7);
-  background: rgba(37, 99, 235, 0.88);
-  transform: translateY(-1px);
-}
-
-.floating-controls button:disabled {
-  color: rgba(148, 163, 184, 0.52);
-  background: rgba(30, 41, 59, 0.48);
-  cursor: not-allowed;
-  transform: none;
+  min-height: 38px;
+  padding: 0 14px;
 }
 
 .error-toast {
   position: absolute;
   right: clamp(14px, 4vw, 24px);
-  bottom: clamp(96px, 15vh, 118px);
+  bottom: clamp(82px, 13vh, 108px);
   z-index: 4;
   max-width: min(400px, calc(100% - 28px));
   padding: 14px 16px;
   border-color: rgba(248, 113, 113, 0.46);
-  border-radius: 14px;
+  border-radius: 12px;
   color: #fecaca;
   font-weight: 700;
 }
 
 @media (max-width: 980px) {
   .ui-layer {
-    width: min(100% - 32px, 860px);
+    width: min(100% - 32px, 900px);
   }
 
   .top-bar {
-    align-items: flex-start;
-    max-width: none;
+    grid-template-columns: minmax(190px, auto) minmax(220px, 1fr);
   }
 
-  .status-chip {
-    top: 98px;
-    width: min(320px, 42vw);
-  }
-
-  .floating-controls {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(132px, 1fr));
-    max-width: 640px;
-  }
-
-  .floating-controls button {
-    width: 100%;
-    min-width: 0;
+  .top-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
   }
 }
 
@@ -337,46 +365,53 @@ button {
   }
 
   .top-bar {
-    order: 0;
-    flex-direction: column;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
     min-height: 0;
-    padding: 13px 15px;
+    padding: 12px;
   }
 
   .brand-block strong {
     white-space: normal;
   }
 
-  .top-bar p {
-    font-size: 14px;
+  .top-guide {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
   }
 
-  .status-chip {
-    position: static;
-    order: 2;
-    align-self: stretch;
-    width: 100%;
-    min-width: 0;
+  .top-guide p {
+    white-space: normal;
+  }
+
+  .top-actions {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+  }
+
+  .compact-action {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 12px;
   }
 
   .center-layer {
-    order: 1;
     flex: 1 1 auto;
     min-height: 260px;
   }
 
   .floating-controls {
-    order: 3;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
     max-width: none;
-    padding: 8px;
   }
 
   .floating-controls button {
-    min-height: 42px;
-    padding: 0 12px;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 10px;
     font-size: 13px;
   }
 
@@ -387,12 +422,19 @@ button {
   }
 }
 
-@media (max-width: 340px) {
-  .ui-layer {
-    width: calc(100% - 18px);
+@media (max-width: 430px) {
+  .top-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .top-actions {
+    grid-column: 1;
+    grid-row: 3;
+    justify-content: flex-start;
   }
 
   .floating-controls {
+    display: grid;
     grid-template-columns: 1fr;
   }
 }

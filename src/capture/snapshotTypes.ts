@@ -1,6 +1,14 @@
 import type { Rect } from "../tracking/handTypes";
 
 export type CapturePhase = "idle" | "ready" | "locked";
+export type CaptureFailureReason =
+  | "none"
+  | "not-ready"
+  | "sim-delta-too-large"
+  | "no-confirmed-rect"
+  | "locked"
+  | "resize-active"
+  | "crop-failed";
 
 export type Snapshot = {
   id: string;
@@ -21,4 +29,5 @@ export type CaptureState = {
   captureReady: boolean;
   readyUntil: number;
   simultaneousDeltaMs: number | null;
+  failureReason: CaptureFailureReason;
 };

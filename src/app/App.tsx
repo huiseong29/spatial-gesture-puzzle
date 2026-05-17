@@ -37,6 +37,63 @@ function modeToKoreanInstruction(status: RuntimeStatus) {
   return "시스템을 준비 중입니다";
 }
 
+function modeToStatusLabel(status: RuntimeStatus) {
+  if (status.phase === "running") {
+    return "RUNNING";
+  }
+
+  if (status.phase === "error") {
+    return "ERROR";
+  }
+
+  if (status.phase === "camera-permission" || status.phase === "model-loading") {
+    return "LOADING";
+  }
+
+  return "READY";
+}
+
+type UnifiedTopBarProps = {
+  status: RuntimeStatus;
+  debugEnabled: boolean;
+  onStart: () => void;
+  onToggleDebug: () => void;
+};
+
+function UnifiedTopBar({ status, debugEnabled, onStart, onToggleDebug }: UnifiedTopBarProps) {
+  return (
+    <header className="top-bar">
+      <div className="brand-block">
+        <span className="eyebrow">Computer Vision · HCI Demo</span>
+        <strong>Spatial Gesture Puzzle</strong>
+      </div>
+
+      <div className="top-guide" aria-live="polite">
+        <span className={`mode-pill mode-${status.phase}`}>{modeToStatusLabel(status)}</span>
+        <p>{modeToKoreanInstruction(status)}</p>
+      </div>
+
+      <div className="top-actions" aria-label="상단 액션">
+        <button
+          type="button"
+          className="compact-action"
+          onClick={onStart}
+          disabled={status.phase === "running" || status.phase === "camera-permission"}
+        >
+          손 인식
+        </button>
+        <button
+          type="button"
+          className={debugEnabled ? "compact-action is-active" : "compact-action"}
+          onClick={onToggleDebug}
+        >
+          Debug
+        </button>
+      </div>
+    </header>
+  );
+}
+
 export function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -96,13 +153,12 @@ export function App() {
         <canvas ref={canvasRef} className="tracking-canvas" />
 
         <div className="ui-layer">
-          <header className="top-bar">
-            <div className="brand-block">
-              <span className="eyebrow">Computer Vision · HCI Demo</span>
-              <strong>Spatial Gesture Puzzle</strong>
-            </div>
-            <p>MediaPipe Hands 기반 양손 pinch interaction으로 캡처 영역을 지정하고 퍼즐을 조작합니다.</p>
-          </header>
+          <UnifiedTopBar
+            status={status}
+            debugEnabled={debugEnabled}
+            onStart={startCamera}
+            onToggleDebug={toggleDebug}
+          />
 
           <div className="center-layer">
             {showStartCard ? (
@@ -119,15 +175,7 @@ export function App() {
             ) : null}
           </div>
 
-          <aside className="status-chip" aria-live="polite">
-            <span>Interaction Guide</span>
-            <strong>{modeToKoreanInstruction(status)}</strong>
-          </aside>
-
           <div className="floating-controls" aria-label="데모 컨트롤">
-            <button type="button" onClick={startCamera} disabled={status.phase === "running"}>
-              카메라 시작
-            </button>
             <button type="button" onClick={stopCamera} disabled={status.phase !== "running"}>
               정지
             </button>
@@ -136,9 +184,6 @@ export function App() {
             </button>
             <button type="button" onClick={retakeSnapshot} disabled={status.phase !== "running"}>
               다시 캡처
-            </button>
-            <button type="button" onClick={toggleDebug} className={debugEnabled ? "is-active" : ""}>
-              {debugEnabled ? "Debug 숨김" : "Debug"}
             </button>
           </div>
         </div>

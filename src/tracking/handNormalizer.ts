@@ -1,5 +1,6 @@
 import type { HandLandmarkerResult, NormalizedLandmark } from "@mediapipe/tasks-vision";
 import { coordinateConfig } from "../config/coordinateConfig";
+import { trackingStabilityConfig } from "../config/trackingStabilityConfig";
 import type { Handedness, ScreenPoint, TrackedHand, TrackingFrame } from "./handTypes";
 import { smoothLandmarks } from "./smoothing";
 
@@ -12,25 +13,73 @@ type NormalizeHandResultsOptions = {
 };
 
 export function normalizeHandResults(options: NormalizeHandResultsOptions): TrackingFrame {
-  const hands = options.result.landmarks.map((landmarks, index) => {
+  const previousHands = options.previousFrame?.hands ?? [];
+  const matchedPreviousIds = new Set<string>();
+  const detections = options.result.landmarks.map((landmarks, index) => {
     const handedness = readHandedness(options.result, index);
-    const previousHand = findPreviousHand(options.previousFrame, handedness.label, index);
     const rawLandmarks = landmarks.map((landmark) => normalizeLandmark(landmark));
-    const smoothedLandmarks = smoothLandmarks(rawLandmarks, previousHand?.smoothedLandmarks);
-    const points = smoothedLandmarks.map((landmark) =>
+    const rawPoints = rawLandmarks.map((landmark) =>
       toScreenPoint(landmark, options.canvas.width, options.canvas.height)
     );
 
-    return createTrackedHand({
+    return {
       index,
       handedness: handedness.label,
       handednessScore: handedness.score,
       rawLandmarks,
-      smoothedLandmarks,
-      points,
-      timestamp: options.timestamp
-    });
+      rawPoints,
+      rawCenter: computeCenter(rawPoints)
+    };
   });
+
+  const hands = detections.flatMap((detection) => {
+    const previousHand = findNearestPreviousHand(detection.rawCenter, previousHands, matchedPreviousIds);
+    const jumpDistancePx = previousHand ? distance(detection.rawCenter, previousHand.center) : 0;
+    const rejectedReason = getRejectedReason(detection.handednessScore, jumpDistancePx, previousHand);
+
+    if (previousHand) {
+      matchedPreviousIds.add(previousHand.id);
+    }
+
+    if (rejectedReason) {
+      const frozen = previousHand
+        ? freezePreviousHand(previousHand, options.timestamp, rejectedReason)
+        : null;
+      return frozen ? [frozen] : [];
+    }
+
+    const smoothedLandmarks = smoothLandmarks(detection.rawLandmarks, previousHand?.smoothedLandmarks);
+    const points = smoothedLandmarks.map((landmark) =>
+      toScreenPoint(landmark, options.canvas.width, options.canvas.height)
+    );
+
+    return [
+      createTrackedHand({
+        index: detection.index,
+        id: previousHand?.id ?? createInitialHandId(detection.handedness, detection.index),
+        handedness: detection.handedness,
+        handednessScore: detection.handednessScore,
+        rawLandmarks: detection.rawLandmarks,
+        smoothedLandmarks,
+        rawPoints: detection.rawPoints,
+        points,
+        previousHand,
+        jumpDistancePx,
+        timestamp: options.timestamp
+      })
+    ];
+  });
+
+  for (const previousHand of previousHands) {
+    if (matchedPreviousIds.has(previousHand.id)) {
+      continue;
+    }
+
+    const frozen = freezePreviousHand(previousHand, options.timestamp, "lost");
+    if (frozen) {
+      hands.push(frozen);
+    }
+  }
 
   return {
     timestamp: options.timestamp,
@@ -74,26 +123,6 @@ function readHandedness(result: HandLandmarkerResult, index: number): { label: H
   };
 }
 
-function findPreviousHand(
-  previousFrame: TrackingFrame | null,
-  handedness: Handedness,
-  fallbackIndex: number
-) {
-  if (!previousFrame) {
-    return undefined;
-  }
-
-  if (handedness === "Left") {
-    return previousFrame.leftHand ?? previousFrame.hands[fallbackIndex];
-  }
-
-  if (handedness === "Right") {
-    return previousFrame.rightHand ?? previousFrame.hands[fallbackIndex];
-  }
-
-  return previousFrame.hands[fallbackIndex];
-}
-
 function normalizeLandmark(landmark: NormalizedLandmark): NormalizedLandmark {
   const x = coordinateConfig.useViewerSpace ? 1 - landmark.x : landmark.x;
 
@@ -115,28 +144,112 @@ function toScreenPoint(landmark: NormalizedLandmark, width: number, height: numb
 
 function createTrackedHand(options: {
   index: number;
+  id: string;
   handedness: Handedness;
   handednessScore: number;
   rawLandmarks: NormalizedLandmark[];
   smoothedLandmarks: NormalizedLandmark[];
+  rawPoints: ScreenPoint[];
   points: ScreenPoint[];
+  previousHand: TrackedHand | undefined;
+  jumpDistancePx: number;
   timestamp: number;
 }): TrackedHand {
   const boundingRect = computeBoundingRect(options.points);
   const center = computeCenter(options.points);
+  const stableFrameCount = (options.previousHand?.stableFrameCount ?? 0) + 1;
+  const trackingState =
+    stableFrameCount >= trackingStabilityConfig.stableFramesRequired ? "stable" : "warming";
 
   return {
-    id: options.handedness === "Unknown" ? `hand-${options.index}` : options.handedness,
+    id: options.id,
     handedness: options.handedness,
     handednessScore: options.handednessScore,
+    trackingState,
+    trackingQuality: options.handednessScore,
+    stableFrameCount,
+    lostFrameCount: 0,
+    rejectedFrameCount: 0,
+    jumpDistancePx: options.jumpDistancePx,
+    rejectedReason: null,
     rawLandmarks: options.rawLandmarks,
     smoothedLandmarks: options.smoothedLandmarks,
+    rawPoints: options.rawPoints,
     points: options.points,
     center,
     boundingRect,
     visible: true,
     lastSeenAt: options.timestamp
   };
+}
+
+function findNearestPreviousHand(
+  center: ScreenPoint,
+  previousHands: TrackedHand[],
+  matchedPreviousIds: Set<string>
+) {
+  let bestHand: TrackedHand | undefined;
+  let bestDistance = Infinity;
+
+  for (const previousHand of previousHands) {
+    if (matchedPreviousIds.has(previousHand.id)) {
+      continue;
+    }
+
+    const centerDistance = distance(center, previousHand.center);
+    if (centerDistance < bestDistance) {
+      bestHand = previousHand;
+      bestDistance = centerDistance;
+    }
+  }
+
+  return bestDistance <= trackingStabilityConfig.outlierRejectThresholdPx ? bestHand : undefined;
+}
+
+function getRejectedReason(
+  handednessScore: number,
+  jumpDistancePx: number,
+  previousHand: TrackedHand | undefined
+): TrackedHand["rejectedReason"] {
+  if (handednessScore < trackingStabilityConfig.minHandScore) {
+    return "low-score";
+  }
+
+  if (previousHand && jumpDistancePx > trackingStabilityConfig.maxJumpPx) {
+    return "jump-outlier";
+  }
+
+  return null;
+}
+
+function freezePreviousHand(
+  previousHand: TrackedHand,
+  timestamp: number,
+  rejectedReason: NonNullable<TrackedHand["rejectedReason"]>
+): TrackedHand | null {
+  const lostFrameCount = previousHand.lostFrameCount + 1;
+  const rejectedFrameCount = previousHand.rejectedFrameCount + 1;
+
+  if (
+    lostFrameCount > trackingStabilityConfig.lostToleranceFrames ||
+    rejectedFrameCount > trackingStabilityConfig.freezeOnUnstableFrames
+  ) {
+    return null;
+  }
+
+  return {
+    ...previousHand,
+    trackingState: "frozen",
+    visible: false,
+    lostFrameCount,
+    rejectedFrameCount,
+    rejectedReason,
+    lastSeenAt: timestamp
+  };
+}
+
+function createInitialHandId(handedness: Handedness, index: number) {
+  return handedness === "Unknown" ? `hand-${index}` : handedness;
 }
 
 function computeBoundingRect(points: ScreenPoint[]) {
@@ -176,4 +289,8 @@ function computeCenter(points: ScreenPoint[]): ScreenPoint {
     y: sum.y / points.length,
     z: sum.z / points.length
   };
+}
+
+function distance(a: ScreenPoint, b: ScreenPoint) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }

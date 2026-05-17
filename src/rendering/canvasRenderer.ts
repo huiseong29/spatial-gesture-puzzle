@@ -6,7 +6,6 @@ import { renderCaptureFlash } from "./captureFlashRenderer";
 import { renderVirtualBoundingBox } from "./virtualBoundingBoxRenderer";
 import { renderSkeleton } from "./skeletonRenderer";
 import { renderPuzzleBoard } from "./puzzleRenderer";
-import { renderModeHud } from "./modeHudRenderer";
 
 type CanvasRenderOptions = {
   video: HTMLVideoElement;
@@ -41,7 +40,7 @@ export class CanvasRenderer {
     this.drawVideo(options.video, width, height);
 
     if (options.frame) {
-      renderVirtualBoundingBox(context, options.frame.virtualBoundingBox);
+      renderVirtualBoundingBox(context, options.frame.virtualBoundingBox, options.frame.capture);
       renderPuzzleBoard(context, options.frame.puzzle);
 
       for (const hand of options.frame.hands) {
@@ -55,8 +54,6 @@ export class CanvasRenderer {
         height
       });
     }
-
-    renderModeHud(context, options.frame);
 
     if (!this.debugEnabled) {
       return;

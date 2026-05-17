@@ -1,6 +1,6 @@
 import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
 
-const SMOOTHING_ALPHA = 0.68;
+const SMOOTHING_ALPHA = 0.42;
 
 export function smoothLandmarks(
   current: NormalizedLandmark[],

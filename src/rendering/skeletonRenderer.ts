@@ -26,8 +26,10 @@ export function renderSkeleton(
   pinch?: PinchGestureState
 ) {
   const colors = COLORS[hand.handedness];
+  const opacity = hand.trackingState === "frozen" ? 0.35 : hand.trackingState === "warming" ? 0.58 : 1;
 
   context.save();
+  context.globalAlpha = opacity;
   context.lineCap = "round";
   context.lineJoin = "round";
   context.lineWidth = 3;

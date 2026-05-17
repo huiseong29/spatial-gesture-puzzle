@@ -41,11 +41,17 @@ export function renderDebugOverlay(context: CanvasRenderingContext2D, options: D
       const pinch = options.pinchGestures.get(hand.id);
 
       if (!pinch) {
-        return [`${hand.handedness} score ${Math.round(hand.handednessScore * 100)}%`];
+        return [
+          `${hand.id} ${hand.handedness} ${hand.trackingState} no-gesture`,
+          `  quality ${Math.round(hand.trackingQuality * 100)} stable ${hand.stableFrameCount} lost ${hand.lostFrameCount}`,
+          `  jump ${Math.round(hand.jumpDistancePx)} reject ${hand.rejectedReason ?? "-"}`
+        ];
       }
 
       return [
-        `${hand.handedness} ${pinch.phase}`,
+        `${hand.id} ${hand.handedness} ${hand.trackingState} ${pinch.phase}`,
+        `  quality ${Math.round(hand.trackingQuality * 100)} stable ${hand.stableFrameCount} lost ${hand.lostFrameCount}`,
+        `  jump ${Math.round(hand.jumpDistancePx)} reject ${hand.rejectedReason ?? "-"}`,
         `  dist ${pinch.normalizedDistance.toFixed(2)} px ${Math.round(pinch.pinchDistancePx)}`,
         `  start ${pinch.startThreshold.toFixed(2)} release ${pinch.releaseThreshold.toFixed(2)}`
       ];
@@ -99,6 +105,7 @@ function formatPuzzleLines(puzzle: PuzzleBoard | null, pinchGestures: Map<string
     `  dragPhase ${interaction.dragPhase}`,
     `  selected ${interaction.selectedPieceId ?? "-"} activeHand ${interaction.activeHandId ?? "-"}`,
     `  hover ${interaction.hoveredPieceId ?? "-"}`,
+    `  grabWindow ${interaction.grabWindowFrames} nearestCell ${interaction.nearestCellIndex ?? "-"}`,
     `  pointerLost ${interaction.pointerLostFrames} releaseGrace ${interaction.releaseGraceFrames}`,
     `  pinchPhase ${activePinch}`,
     `  pointer ${formatPoint(interaction.pointer)}`,
@@ -119,6 +126,7 @@ function formatCaptureLines(capture: CaptureState | null) {
   return [
     `Capture ${capture.phase} ready ${capture.captureReady ? "yes" : "no"}`,
     `  trigger ${capture.lastTrigger}`,
+    `  fail ${capture.failureReason}`,
     `  readyUntil ${capture.readyUntil ? Math.round(capture.readyUntil) : "-"}`,
     `  simDelta ${capture.simultaneousDeltaMs === null ? "-" : Math.round(capture.simultaneousDeltaMs)}`,
     `  lockedUntil ${capture.lockedUntil ? Math.round(capture.lockedUntil) : "-"}`,

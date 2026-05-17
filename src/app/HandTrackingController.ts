@@ -162,12 +162,13 @@ export class HandTrackingController {
       });
       const normalizeEnd = performance.now();
       const interactionStart = performance.now();
-      frame.pinchGestures = this.pinchDetector.update(frame.hands, now);
+      const interactionHands = frame.hands.filter(isInteractionStableHand);
+      frame.pinchGestures = this.pinchDetector.update(interactionHands, now);
       const puzzleActive = Boolean(frame.puzzle?.mode === "ready" || frame.puzzle?.mode === "completed");
 
       if (!puzzleActive && !this.snapshotCaptureManager.isLocked(now)) {
         frame.virtualBoundingBox = this.virtualBoundingBoxTracker.update({
-          hands: frame.hands,
+          hands: interactionHands,
           pinchGestures: frame.pinchGestures,
           canvasWidth: this.canvas.width,
           canvasHeight: this.canvas.height,
@@ -185,7 +186,7 @@ export class HandTrackingController {
         frame.capture?.latestSnapshot ?? null,
         this.canvas.width,
         this.canvas.height,
-        frame.hands,
+        interactionHands,
         frame.pinchGestures
       );
       const interactionEnd = performance.now();
@@ -245,6 +246,10 @@ export class HandTrackingController {
   private setStatus(phase: RuntimePhase, message: string) {
     this.onStatus({ phase, message });
   }
+}
+
+function isInteractionStableHand(hand: TrackingFrame["hands"][number]) {
+  return hand.trackingState === "stable";
 }
 
 function formatStartupError(error: unknown) {

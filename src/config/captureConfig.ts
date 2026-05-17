@@ -3,6 +3,6 @@ export const captureConfig = {
   flashDurationMs: 220,
   minCropWidth: 32,
   minCropHeight: 32,
-  captureReadyWindowMs: 1500,
-  simultaneousThresholdMs: 120
+  captureReadyWindowMs: 2400,
+  simultaneousThresholdMs: 300
 } as const;

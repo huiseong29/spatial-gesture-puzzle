@@ -2,7 +2,7 @@ import { captureConfig } from "../config/captureConfig";
 import type { PinchGestureState } from "../interaction/gestures/pinchTypes";
 import type { TrackingFrame } from "../tracking/handTypes";
 import { captureSnapshot } from "./snapshotCropper";
-import type { CaptureState } from "./snapshotTypes";
+import type { CaptureFailureReason, CaptureState } from "./snapshotTypes";
 
 type UpdateOptions = {
   frame: TrackingFrame;
@@ -23,7 +23,8 @@ export class SnapshotCaptureManager {
         phase: "locked",
         lastTrigger: "none",
         captureReady: false,
-        simultaneousDeltaMs: null
+        simultaneousDeltaMs: null,
+        failureReason: "locked"
       };
       return this.state;
     }
@@ -36,7 +37,10 @@ export class SnapshotCaptureManager {
       options.timestamp
     );
 
-    if (!captureReady || !simultaneous.matched || !canCapture(options.frame)) {
+    const blockReason = getCaptureBlockReason(options.frame);
+    const failureReason = getCaptureFailureReason(captureReady, simultaneous, blockReason);
+
+    if (failureReason !== "none") {
       this.state = {
         ...this.state,
         phase: captureReady ? "ready" : "idle",
@@ -44,7 +48,8 @@ export class SnapshotCaptureManager {
         lastTrigger: "none",
         captureReady,
         readyUntil,
-        simultaneousDeltaMs: simultaneous.deltaMs
+        simultaneousDeltaMs: simultaneous.deltaMs,
+        failureReason
       };
       return this.state;
     }
@@ -63,6 +68,13 @@ export class SnapshotCaptureManager {
     });
 
     if (!snapshot) {
+      this.state = {
+        ...this.state,
+        captureReady,
+        readyUntil,
+        simultaneousDeltaMs: simultaneous.deltaMs,
+        failureReason: "crop-failed"
+      };
       return this.state;
     }
 
@@ -74,7 +86,8 @@ export class SnapshotCaptureManager {
       lastTrigger: "both-hand-simultaneous-pinch-start",
       captureReady: false,
       readyUntil,
-      simultaneousDeltaMs: simultaneous.deltaMs
+      simultaneousDeltaMs: simultaneous.deltaMs,
+      failureReason: "none"
     };
 
     return this.state;
@@ -111,7 +124,8 @@ function createInitialState(): CaptureState {
     lastTrigger: "none",
     captureReady: false,
     readyUntil: 0,
-    simultaneousDeltaMs: null
+    simultaneousDeltaMs: null,
+    failureReason: "none"
   };
 }
 
@@ -156,20 +170,44 @@ function getSimultaneousPinchStart(
   };
 }
 
-function canCapture(frame: TrackingFrame) {
+function getCaptureFailureReason(
+  captureReady: boolean,
+  simultaneous: { matched: boolean; deltaMs: number | null },
+  blockReason: CaptureFailureReason
+): CaptureFailureReason {
+  if (blockReason !== "none") {
+    return blockReason;
+  }
+
+  if (!captureReady) {
+    return "not-ready";
+  }
+
+  if (!simultaneous.matched) {
+    return simultaneous.deltaMs === null ? "not-ready" : "sim-delta-too-large";
+  }
+
+  return "none";
+}
+
+function getCaptureBlockReason(frame: TrackingFrame): CaptureFailureReason {
   const box = frame.virtualBoundingBox;
 
+  if (box?.mode === "editing") {
+    return "resize-active";
+  }
+
   if (!box || !box.active || box.mode !== "idle") {
-    return false;
+    return "no-confirmed-rect";
   }
 
   if (
     box.confirmedRect.width < captureConfig.minCropWidth ||
     box.confirmedRect.height < captureConfig.minCropHeight
   ) {
-    return false;
+    return "no-confirmed-rect";
   }
 
   const gestures = [...frame.pinchGestures.values()];
-  return gestures.filter((gesture) => gesture.isPinching).length === 2;
+  return gestures.filter((gesture) => gesture.isPinching).length >= 2 ? "none" : "not-ready";
 }

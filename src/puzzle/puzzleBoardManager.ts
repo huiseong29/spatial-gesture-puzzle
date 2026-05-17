@@ -67,15 +67,18 @@ export class PuzzleBoardManager {
         pointerVelocityPxPerSec: 0,
         pointerSmoothingAlpha: 0,
         pointerLagPx: 0,
+        grabWindowFrames: 0,
         pointerLostFrames: 0,
         releaseGraceFrames: 0,
         dragOffset: {
           x: 0,
           y: 0
         },
+        originCellIndex: null,
         hoveredPieceId: null,
         lastSnapPieceId: null,
         snapDistancePx: null,
+        nearestCellIndex: null,
         completed: false
       }
     };

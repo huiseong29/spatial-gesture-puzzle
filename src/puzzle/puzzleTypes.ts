@@ -25,15 +25,18 @@ export type PuzzleInteractionState = {
   pointerVelocityPxPerSec: number;
   pointerSmoothingAlpha: number;
   pointerLagPx: number;
+  grabWindowFrames: number;
   pointerLostFrames: number;
   releaseGraceFrames: number;
   dragOffset: {
     x: number;
     y: number;
   };
+  originCellIndex: number | null;
   hoveredPieceId: string | null;
   lastSnapPieceId: string | null;
   snapDistancePx: number | null;
+  nearestCellIndex: number | null;
   completed: boolean;
 };
 
