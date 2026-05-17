@@ -1,8 +1,17 @@
 import { puzzleConfig } from "../config/puzzleConfig";
 import type { PuzzleBoard } from "../puzzle/puzzleTypes";
+import type { InteractionConfidenceState } from "../tracking/handTypes";
 import { renderInteractionHeatmap } from "./heatmapRenderer";
+import { getRipenessTheme } from "./ripenessTheme";
+import type { ThemeMode } from "../theme/themeTypes";
+import { getThemeTokens } from "../theme/themeTokens";
 
-export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: PuzzleBoard | null) {
+export function renderPuzzleBoard(
+  context: CanvasRenderingContext2D,
+  board: PuzzleBoard | null,
+  confidence: InteractionConfidenceState | null = null,
+  themeMode: ThemeMode = "dark"
+) {
   if (
     !board ||
     (board.mode !== "transitioning" && board.mode !== "ready" && board.mode !== "completed") ||
@@ -12,6 +21,8 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
   }
 
   context.save();
+  const theme = getRipenessTheme(confidence, themeMode);
+  const tokens = getThemeTokens(themeMode);
   const transition = getTransitionProgress(board);
   const completion = getCompletionProgress(board);
   renderBoardFrame(context, board, transition.gridOpacity);
@@ -20,7 +31,7 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
     renderFrozenSnapshot(context, board, transition.snapshotOpacity);
   }
 
-  renderSnapPreview(context, board);
+  renderSnapPreview(context, board, theme, tokens);
 
   const selectedPiece = board.pieces.find((piece) => piece.id === board.interaction.selectedPieceId);
   const drawPieces = selectedPiece
@@ -39,8 +50,8 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
     }
 
     context.globalAlpha = transition.pieceOpacity * (1 - completion.mergeOpacity * 0.38);
-    context.shadowColor = getPieceShadowColor(selected, snapped, piece.locked, snapPulse);
-    context.shadowBlur = getPieceShadowBlur(selected, snapped, piece.locked, snapPulse);
+    context.shadowColor = getPieceShadowColor(selected, snapped, piece.locked, snapPulse, theme.accentGlow, tokens.lockedAccent);
+    context.shadowBlur = getPieceShadowBlur(selected, snapped, piece.locked, snapPulse, theme.pulse);
     context.shadowOffsetY = selected ? 6 : piece.locked ? 1 : 3;
 
     context.save();
@@ -61,7 +72,7 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
 
     context.shadowBlur = 0;
     context.shadowOffsetY = 0;
-    context.strokeStyle = getPieceStrokeStyle(selected, snapped, piece.locked, snapPulse);
+    context.strokeStyle = getPieceStrokeStyle(selected, snapped, piece.locked, snapPulse, theme.accent, tokens.lockedAccent);
     context.lineWidth = piece.locked
       ? puzzleConfig.lockedOutlineWidth
       : selected
@@ -73,11 +84,11 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
     context.stroke();
 
     if (piece.locked) {
-      renderLockedMarker(context, displayRect, radius, snapPulse);
+      renderLockedMarker(context, displayRect, radius, snapPulse, tokens);
     }
 
     if (snapped || (piece.locked && snapPulse > 0)) {
-      renderSnapPulse(context, displayRect, radius, snapPulse);
+      renderSnapPulse(context, displayRect, radius, snapPulse, theme);
     }
 
     context.globalAlpha = 1;
@@ -87,12 +98,12 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
     renderMergedImage(context, board, completion.mergeOpacity);
   }
 
-  renderInteractionHeatmap(context, board);
+  renderInteractionHeatmap(context, board, themeMode);
 
   if (board.interaction.pointer && board.mode !== "completed") {
-    context.fillStyle = "rgba(239, 68, 68, 0.95)";
-    context.shadowColor = "rgba(239, 68, 68, 0.52)";
-    context.shadowBlur = 14;
+    context.fillStyle = withAlpha(theme.accent, 0.95);
+    context.shadowColor = theme.accentGlow;
+    context.shadowBlur = 12 * theme.pulse;
     context.beginPath();
     context.arc(board.interaction.pointer.x, board.interaction.pointer.y, 7, 0, Math.PI * 2);
     context.fill();
@@ -106,7 +117,12 @@ export function renderPuzzleBoard(context: CanvasRenderingContext2D, board: Puzz
   context.restore();
 }
 
-function renderSnapPreview(context: CanvasRenderingContext2D, board: PuzzleBoard) {
+function renderSnapPreview(
+  context: CanvasRenderingContext2D,
+  board: PuzzleBoard,
+  theme: ReturnType<typeof getRipenessTheme>,
+  tokens: ReturnType<typeof getThemeTokens>
+) {
   const preview = board.interaction.snapPreview;
 
   if (!preview || board.mode !== "ready") {
@@ -119,16 +135,16 @@ function renderSnapPreview(context: CanvasRenderingContext2D, board: PuzzleBoard
   const rect = preview.cellRect;
 
   context.save();
-  context.shadowColor = preview.isCorrect ? "rgba(239, 68, 68, 0.64)" : "rgba(254, 215, 170, 0.42)";
+  context.shadowColor = preview.isCorrect ? theme.accentGlow : withAlpha(tokens.cream, 0.42);
   context.shadowBlur = preview.isCorrect ? 18 + preview.strength * 16 : 10 + preview.strength * 8;
   context.fillStyle = preview.isCorrect
-    ? `rgba(239, 68, 68, ${alpha})`
-    : `rgba(254, 215, 170, ${alpha})`;
+    ? withAlpha(theme.accent, alpha)
+    : withAlpha(tokens.cream, alpha);
   roundRect(context, rect.x, rect.y, rect.width, rect.height, puzzleConfig.cellHighlightRadius);
   context.fill();
   context.strokeStyle = preview.isCorrect
-    ? `rgba(239, 68, 68, ${0.7 + preview.strength * 0.28})`
-    : `rgba(254, 215, 170, ${0.42 + preview.strength * 0.34})`;
+    ? withAlpha(theme.accent, 0.7 + preview.strength * 0.28)
+    : withAlpha(tokens.cream, 0.42 + preview.strength * 0.34);
   context.lineWidth = preview.isCorrect ? 3 : 2;
   roundRect(context, rect.x, rect.y, rect.width, rect.height, puzzleConfig.cellHighlightRadius);
   context.stroke();
@@ -255,15 +271,16 @@ function renderLockedMarker(
   context: CanvasRenderingContext2D,
   rect: { x: number; y: number; width: number; height: number },
   radius: number,
-  pulse: number
+  pulse: number,
+  tokens: ReturnType<typeof getThemeTokens>
 ) {
   context.save();
-  context.fillStyle = `rgba(134, 239, 172, ${puzzleConfig.lockedFillAlpha})`;
+  context.fillStyle = withAlpha(tokens.lockedAccent, puzzleConfig.lockedFillAlpha);
   roundRect(context, rect.x, rect.y, rect.width, rect.height, radius);
   context.fill();
-  context.shadowColor = `rgba(134, 239, 172, ${puzzleConfig.lockedGlowAlpha})`;
+  context.shadowColor = withAlpha(tokens.lockedAccent, puzzleConfig.lockedGlowAlpha);
   context.shadowBlur = 8 + pulse * 5;
-  context.strokeStyle = `rgba(134, 239, 172, ${0.62 + pulse * 0.1})`;
+  context.strokeStyle = withAlpha(tokens.lockedAccent, 0.62 + pulse * 0.1);
   context.lineWidth = puzzleConfig.lockedOutlineWidth;
   roundRect(context, rect.x + 1.5, rect.y + 1.5, rect.width - 3, rect.height - 3, Math.max(4, radius - 2));
   context.stroke();
@@ -275,14 +292,15 @@ function renderSnapPulse(
   context: CanvasRenderingContext2D,
   rect: { x: number; y: number; width: number; height: number },
   radius: number,
-  pulse: number
+  pulse: number,
+  theme: ReturnType<typeof getRipenessTheme>
 ) {
   context.save();
   context.globalAlpha = 0.35 + pulse * 0.55;
-  context.strokeStyle = "rgba(239, 68, 68, 0.72)";
+  context.strokeStyle = withAlpha(theme.accent, 0.72);
   context.lineWidth = 4 + pulse * 3;
-  context.shadowColor = "rgba(239, 68, 68, 0.55)";
-  context.shadowBlur = 16 + pulse * 16;
+  context.shadowColor = theme.accentGlow;
+  context.shadowBlur = (14 + pulse * 14) * theme.pulse;
   roundRect(
     context,
     rect.x - 5 - pulse * 5,
@@ -295,40 +313,76 @@ function renderSnapPulse(
   context.restore();
 }
 
-function getPieceShadowColor(selected: boolean, snapped: boolean, locked: boolean, pulse: number) {
+function getPieceShadowColor(
+  selected: boolean,
+  snapped: boolean,
+  locked: boolean,
+  pulse: number,
+  accentGlow: string,
+  lockedAccent: string
+) {
   if (locked) {
-    return `rgba(134, 239, 172, ${puzzleConfig.lockedGlowAlpha + pulse * 0.08})`;
+    return withAlpha(lockedAccent, puzzleConfig.lockedGlowAlpha + pulse * 0.08);
   }
 
   if (selected) {
-    return `rgba(239, 68, 68, ${0.62 + pulse * 0.22})`;
+    return accentGlow;
   }
 
   return snapped ? "rgba(251, 146, 60, 0.42)" : "rgba(24, 10, 8, 0.34)";
 }
 
-function getPieceShadowBlur(selected: boolean, snapped: boolean, locked: boolean, pulse: number) {
+function getPieceShadowBlur(selected: boolean, snapped: boolean, locked: boolean, pulse: number, themePulse: number) {
   if (locked) {
     return 6 + pulse * 5;
   }
 
   if (selected) {
-    return 20 + pulse * 10;
+    return (16 + pulse * 10) * themePulse;
   }
 
   return snapped ? 14 + pulse * 14 : 7;
 }
 
-function getPieceStrokeStyle(selected: boolean, snapped: boolean, locked: boolean, pulse: number) {
+function getPieceStrokeStyle(
+  selected: boolean,
+  snapped: boolean,
+  locked: boolean,
+  pulse: number,
+  accent: string,
+  lockedAccent: string
+) {
   if (locked) {
-    return `rgba(134, 239, 172, ${0.62 + pulse * 0.1})`;
+    return withAlpha(lockedAccent, 0.62 + pulse * 0.1);
   }
 
   if (selected) {
-    return "rgba(239, 68, 68, 0.98)";
+    return withAlpha(accent, 0.98);
   }
 
-  return snapped ? "rgba(239, 68, 68, 0.88)" : "rgba(255, 237, 213, 0.58)";
+  return snapped ? withAlpha(accent, 0.88) : "rgba(255, 237, 213, 0.58)";
+}
+
+function withAlpha(color: string, alpha: number) {
+  if (color.startsWith("#")) {
+    const [r, g, b] = hexToRgb(color);
+    return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+  }
+
+  if (color.startsWith("rgba(")) {
+    return color;
+  }
+
+  return color.replace("rgb(", "rgba(").replace(")", `, ${alpha.toFixed(3)})`);
+}
+
+function hexToRgb(hex: string) {
+  const normalized = hex.replace("#", "");
+  return [
+    Number.parseInt(normalized.slice(0, 2), 16),
+    Number.parseInt(normalized.slice(2, 4), 16),
+    Number.parseInt(normalized.slice(4, 6), 16)
+  ];
 }
 
 function roundRect(

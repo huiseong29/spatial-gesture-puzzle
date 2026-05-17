@@ -5,6 +5,9 @@ import type { CaptureState } from "../capture/snapshotTypes";
 import type { PuzzleBoard } from "../puzzle/puzzleTypes";
 import { getLockedPieceCount } from "../puzzle/puzzleCompletion";
 import type { FrameProfile } from "../tracking/handTypes";
+import type { InteractionConfidenceState } from "../tracking/handTypes";
+import type { ThemeMode } from "../theme/themeTypes";
+import { getThemeTokens } from "../theme/themeTokens";
 
 export type DebugOverlayOptions = {
   fps: number;
@@ -15,9 +18,14 @@ export type DebugOverlayOptions = {
   virtualBoundingBox: VirtualBoundingBox | null;
   capture: CaptureState | null;
   puzzle: PuzzleBoard | null;
+  interactionConfidence: InteractionConfidenceState | null;
 };
 
-export function renderDebugOverlay(context: CanvasRenderingContext2D, options: DebugOverlayOptions) {
+export function renderDebugOverlay(
+  context: CanvasRenderingContext2D,
+  options: DebugOverlayOptions,
+  themeMode: ThemeMode = "dark"
+) {
   const box = options.virtualBoundingBox;
   const boxLines = options.virtualBoundingBox
     ? [
@@ -33,6 +41,7 @@ export function renderDebugOverlay(context: CanvasRenderingContext2D, options: D
   const lines = [
     `FPS ${options.fps}`,
     ...formatProfileLines(options.profile),
+    ...formatRipenessLines(options.interactionConfidence),
     `Hands ${options.handCount}/2`,
     ...boxLines,
     ...formatCaptureLines(options.capture),
@@ -59,21 +68,33 @@ export function renderDebugOverlay(context: CanvasRenderingContext2D, options: D
   ];
 
   context.save();
+  const theme = getThemeTokens(themeMode);
   context.font = "600 16px Inter, system-ui, sans-serif";
   context.textBaseline = "top";
 
   const width = Math.max(...lines.map((line) => context.measureText(line).width)) + 28;
   const height = lines.length * 24 + 20;
 
-  context.fillStyle = "rgba(2, 6, 23, 0.72)";
+  context.fillStyle = themeMode === "light" ? "rgba(255, 255, 255, 0.86)" : "rgba(2, 6, 23, 0.72)";
   context.fillRect(16, 16, width, height);
-  context.fillStyle = "rgba(241, 245, 249, 0.96)";
+  context.fillStyle = themeMode === "light" ? theme.textPrimary : "rgba(241, 245, 249, 0.96)";
 
   lines.forEach((line, index) => {
     context.fillText(line, 30, 28 + index * 24);
   });
 
   context.restore();
+}
+
+function formatRipenessLines(confidence: InteractionConfidenceState | null) {
+  if (!confidence) {
+    return ["Ripeness -"];
+  }
+
+  return [
+    `Ripeness ${Math.round(confidence.ripeness * 100)}% confidence ${confidence.gestureConfidence.toFixed(2)}`,
+    `  stableHands ${confidence.stableHands} jitter ${Math.round(confidence.jitterPx)} lag ${Math.round(confidence.lagPx)}`
+  ];
 }
 
 function formatProfileLines(profile: FrameProfile | null) {

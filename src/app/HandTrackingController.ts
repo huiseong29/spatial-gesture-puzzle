@@ -8,6 +8,8 @@ import { PinchDetector } from "../interaction/gestures/pinchDetector";
 import { VirtualBoundingBoxTracker } from "../interaction/boundingBox/virtualBoundingBoxTracker";
 import { SnapshotCaptureManager } from "../capture/snapshotCaptureManager";
 import { PuzzleBoardManager } from "../puzzle/puzzleBoardManager";
+import { calculateInteractionConfidence } from "../interaction/interactionConfidence";
+import type { ThemeMode } from "../theme/themeTypes";
 
 export type RuntimePhase =
   | "idle"
@@ -147,6 +149,10 @@ export class HandTrackingController {
     this.renderer.setDebugEnabled(enabled);
   }
 
+  setThemeMode(themeMode: ThemeMode) {
+    this.renderer.setThemeMode(themeMode);
+  }
+
   private loop = () => {
     if (this.stopped) {
       return;
@@ -206,6 +212,12 @@ export class HandTrackingController {
         interactionHands,
         frame.pinchGestures
       );
+      frame.interactionConfidence = calculateInteractionConfidence({
+        hands: interactionHands,
+        pinchGestures: frame.pinchGestures,
+        puzzle: frame.puzzle,
+        previous: this.lastFrame?.interactionConfidence ?? null
+      });
 
       if (this.puzzleBoardManager.consumeAutoResetRequested()) {
         this.snapshotCaptureManager.clearSnapshot();

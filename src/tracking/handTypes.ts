@@ -48,6 +48,15 @@ export type FrameProfile = {
   totalMs: number;
 };
 
+export type InteractionConfidenceState = {
+  score: number;
+  ripeness: number;
+  stableHands: number;
+  gestureConfidence: number;
+  jitterPx: number;
+  lagPx: number;
+};
+
 export type TrackingFrame = {
   timestamp: number;
   profile: FrameProfile;
@@ -56,6 +65,7 @@ export type TrackingFrame = {
   virtualBoundingBox: VirtualBoundingBox | null;
   capture: CaptureState | null;
   puzzle: PuzzleBoard | null;
+  interactionConfidence: InteractionConfidenceState;
   leftHand: TrackedHand | null;
   rightHand: TrackedHand | null;
   rawVideoSize: {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { HandTrackingController, type ExperienceState, type RuntimeStatus } from "./HandTrackingController";
+import type { ThemeMode } from "../theme/themeTypes";
 
 function modeToKoreanInstruction(status: RuntimeStatus) {
   if (status.phase === "idle") {
@@ -56,11 +57,20 @@ function modeToStatusLabel(status: RuntimeStatus) {
 type UnifiedTopBarProps = {
   status: RuntimeStatus;
   debugEnabled: boolean;
+  themeMode: ThemeMode;
   onStart: () => void;
   onToggleDebug: () => void;
+  onToggleTheme: () => void;
 };
 
-function UnifiedTopBar({ status, debugEnabled, onStart, onToggleDebug }: UnifiedTopBarProps) {
+function UnifiedTopBar({
+  status,
+  debugEnabled,
+  themeMode,
+  onStart,
+  onToggleDebug,
+  onToggleTheme
+}: UnifiedTopBarProps) {
   return (
     <header className="top-bar">
       <div className="brand-block">
@@ -89,6 +99,9 @@ function UnifiedTopBar({ status, debugEnabled, onStart, onToggleDebug }: Unified
         >
           Debug
         </button>
+        <button type="button" className="compact-action" onClick={onToggleTheme}>
+          {themeMode === "dark" ? "Light" : "Dark"}
+        </button>
       </div>
     </header>
   );
@@ -112,6 +125,7 @@ export function App() {
   });
   const [experienceState, setExperienceState] = useState<ExperienceState>(createInitialExperienceState);
   const [debugEnabled, setDebugEnabled] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredTheme());
   const showStartCard = status.phase !== "running";
   const showAnalysisButton =
     status.phase === "running" &&
@@ -136,12 +150,17 @@ export function App() {
     });
 
     controllerRef.current = controller;
-
     return () => {
       controller.stop();
       controllerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    window.localStorage.setItem("spatial-gesture-theme", themeMode);
+    controllerRef.current?.setThemeMode(themeMode);
+  }, [themeMode]);
 
   const startCamera = () => {
     void controllerRef.current?.start();
@@ -175,8 +194,12 @@ export function App() {
     controllerRef.current?.setDebugEnabled(next);
   };
 
+  const toggleTheme = () => {
+    setThemeMode((current) => (current === "dark" ? "light" : "dark"));
+  };
+
   return (
-    <main className="experience-shell">
+    <main className="experience-shell" data-theme={themeMode}>
       <section className="stage" aria-label="손 제스처 퍼즐 인터랙션 데모">
         <video ref={videoRef} className="camera-video" playsInline muted />
         <canvas ref={canvasRef} className="tracking-canvas" />
@@ -185,8 +208,10 @@ export function App() {
           <UnifiedTopBar
             status={status}
             debugEnabled={debugEnabled}
+            themeMode={themeMode}
             onStart={startCamera}
             onToggleDebug={toggleDebug}
+            onToggleTheme={toggleTheme}
           />
 
           <div className="center-layer">
@@ -259,4 +284,9 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function readStoredTheme(): ThemeMode {
+  const stored = window.localStorage.getItem("spatial-gesture-theme");
+  return stored === "light" || stored === "dark" ? stored : "light";
 }

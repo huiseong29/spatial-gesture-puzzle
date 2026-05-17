@@ -6,6 +6,7 @@ import { renderCaptureFlash } from "./captureFlashRenderer";
 import { renderVirtualBoundingBox } from "./virtualBoundingBoxRenderer";
 import { renderSkeleton } from "./skeletonRenderer";
 import { renderPuzzleBoard } from "./puzzleRenderer";
+import type { ThemeMode } from "../theme/themeTypes";
 
 type CanvasRenderOptions = {
   video: HTMLVideoElement;
@@ -19,6 +20,7 @@ export class CanvasRenderer {
   private lastDebugSampleAt = 0;
   private debugSample: DebugOverlayOptions | null = null;
   private debugEnabled = false;
+  private themeMode: ThemeMode = "dark";
 
   constructor(canvas: HTMLCanvasElement) {
     const context = canvas.getContext("2d");
@@ -40,8 +42,14 @@ export class CanvasRenderer {
     this.drawVideo(options.video, width, height);
 
     if (options.frame) {
-      renderVirtualBoundingBox(context, options.frame.virtualBoundingBox, options.frame.capture);
-      renderPuzzleBoard(context, options.frame.puzzle);
+      renderVirtualBoundingBox(
+        context,
+        options.frame.virtualBoundingBox,
+        options.frame.capture,
+        options.frame.interactionConfidence,
+        this.themeMode
+      );
+      renderPuzzleBoard(context, options.frame.puzzle, options.frame.interactionConfidence, this.themeMode);
 
       for (const hand of options.frame.hands) {
         renderSkeleton(context, hand, options.frame.pinchGestures.get(hand.id));
@@ -69,16 +77,21 @@ export class CanvasRenderer {
         pinchGestures: options.frame?.pinchGestures ?? new Map(),
         virtualBoundingBox: options.frame?.virtualBoundingBox ?? null,
         capture: options.frame?.capture ?? null,
-        puzzle: options.frame?.puzzle ?? null
+        puzzle: options.frame?.puzzle ?? null,
+        interactionConfidence: options.frame?.interactionConfidence ?? null
       };
       this.lastDebugSampleAt = now;
     }
 
-    renderDebugOverlay(context, this.debugSample);
+    renderDebugOverlay(context, this.debugSample, this.themeMode);
   }
 
   setDebugEnabled(enabled: boolean) {
     this.debugEnabled = enabled;
+  }
+
+  setThemeMode(themeMode: ThemeMode) {
+    this.themeMode = themeMode;
   }
 
   private drawVideo(video: HTMLVideoElement, width: number, height: number) {

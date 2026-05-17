@@ -1,9 +1,12 @@
 import { puzzleConfig } from "../config/puzzleConfig";
 import type { PuzzleBoard } from "../puzzle/puzzleTypes";
+import { getThemeTokens } from "../theme/themeTokens";
+import type { ThemeMode } from "../theme/themeTypes";
 
 export function renderInteractionHeatmap(
   context: CanvasRenderingContext2D,
-  board: PuzzleBoard | null
+  board: PuzzleBoard | null,
+  themeMode: ThemeMode = "dark"
 ) {
   if (
     !board ||
@@ -26,9 +29,10 @@ export function renderInteractionHeatmap(
   const fade = 1;
   const visibleCount = Math.max(1, Math.floor(samples.length * reveal));
   const visibleSamples = samples.slice(0, visibleCount);
+  const tokens = getThemeTokens(themeMode);
 
   context.save();
-  context.fillStyle = "rgba(24, 10, 8, 0.46)";
+  context.fillStyle = tokens.heatmapDim;
   context.fillRect(0, 0, context.canvas.width, context.canvas.height);
   context.globalCompositeOperation = "lighter";
 
@@ -39,7 +43,7 @@ export function renderInteractionHeatmap(
     const radius = sample.dragging ? puzzleConfig.heatmapPointRadiusPx : puzzleConfig.heatmapPointRadiusPx * 0.7;
     const gradient = context.createRadialGradient(sample.x, sample.y, 0, sample.x, sample.y, radius);
 
-    gradient.addColorStop(0, `rgba(239, 68, 68, ${alpha})`);
+    gradient.addColorStop(0, withAlpha(tokens.tomatoPrimary, alpha));
     gradient.addColorStop(0.45, `rgba(251, 146, 60, ${alpha * 0.55})`);
     gradient.addColorStop(1, "rgba(239, 68, 68, 0)");
 
@@ -49,14 +53,15 @@ export function renderInteractionHeatmap(
     context.fill();
   }
 
-  renderReplayTrace(context, visibleSamples, fade);
+  renderReplayTrace(context, visibleSamples, fade, tokens.cream);
   context.restore();
 }
 
 function renderReplayTrace(
   context: CanvasRenderingContext2D,
   samples: Array<{ x: number; y: number; dragging: boolean }>,
-  fade: number
+  fade: number,
+  traceColor: string
 ) {
   if (samples.length < 2) {
     return;
@@ -66,7 +71,7 @@ function renderReplayTrace(
   context.lineCap = "round";
   context.lineJoin = "round";
   context.lineWidth = 2.4;
-  context.strokeStyle = `rgba(255, 237, 213, ${0.42 * fade})`;
+  context.strokeStyle = withAlpha(traceColor, 0.42 * fade);
   context.beginPath();
 
   let started = false;
@@ -85,6 +90,18 @@ function renderReplayTrace(
   }
 
   context.stroke();
+}
+
+function withAlpha(color: string, alpha: number) {
+  if (color.startsWith("#")) {
+    const normalized = color.replace("#", "");
+    const r = Number.parseInt(normalized.slice(0, 2), 16);
+    const g = Number.parseInt(normalized.slice(2, 4), 16);
+    const b = Number.parseInt(normalized.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+  }
+
+  return color.replace("rgb(", "rgba(").replace(")", `, ${alpha.toFixed(3)})`);
 }
 
 function clamp01(value: number) {

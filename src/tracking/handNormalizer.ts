@@ -95,6 +95,14 @@ export function normalizeHandResults(options: NormalizeHandResultsOptions): Trac
     virtualBoundingBox: options.previousFrame?.virtualBoundingBox ?? null,
     capture: options.previousFrame?.capture ?? null,
     puzzle: options.previousFrame?.puzzle ?? null,
+    interactionConfidence: options.previousFrame?.interactionConfidence ?? {
+      score: 0,
+      ripeness: 0,
+      stableHands: 0,
+      gestureConfidence: 0,
+      jitterPx: 0,
+      lagPx: 0
+    },
     leftHand: hands.find((hand) => hand.handedness === "Left") ?? null,
     rightHand: hands.find((hand) => hand.handedness === "Right") ?? null,
     rawVideoSize: {
