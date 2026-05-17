@@ -196,6 +196,7 @@ function createLoadingBoard(
       height: snapshot.cropRectCanvas.height
     },
     pieces: [],
+    shuffleValid: true,
     transition: null,
     difficulty,
     interaction: createInitialInteraction()

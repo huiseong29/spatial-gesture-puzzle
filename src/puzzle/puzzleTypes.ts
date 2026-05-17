@@ -97,6 +97,7 @@ export type PuzzleBoard = {
   cols: number;
   boardRect: Rect;
   pieces: PuzzlePiece[];
+  shuffleValid: boolean;
   interaction: PuzzleInteractionState;
   transition: PuzzleTransitionState | null;
   difficulty: DifficultyState;

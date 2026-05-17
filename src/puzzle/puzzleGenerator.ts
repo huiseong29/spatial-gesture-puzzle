@@ -14,7 +14,7 @@ export async function createPuzzleBoardFromSnapshot(
   const difficulty = calculateDifficulty(snapshot, canvasWidth, canvasHeight, previousDifficulty);
   const sourceArea = computeSourceArea(snapshot, boardRect);
   const pieces = createPieces(sourceArea, boardRect, difficulty.gridSize, difficulty.gridSize);
-  const shuffledIndexes = createShuffledIndexes(pieces.length);
+  const shuffleResult = createDerangedIndexes(pieces.length);
 
   return {
     mode: "transitioning",
@@ -25,9 +25,11 @@ export async function createPuzzleBoardFromSnapshot(
     boardRect,
     pieces: pieces.map((piece, index) => ({
       ...piece,
-      currentIndex: shuffledIndexes[index],
-      currentRect: cellRectForIndex(shuffledIndexes[index], boardRect, difficulty.gridSize, difficulty.gridSize)
+      currentIndex: shuffleResult.indexes[index],
+      currentRect: cellRectForIndex(shuffleResult.indexes[index], boardRect, difficulty.gridSize, difficulty.gridSize),
+      locked: false
     })),
+    shuffleValid: shuffleResult.valid,
     interaction: createInitialInteraction(),
     transition: createInitialTransition(difficulty.gridSize),
     difficulty
@@ -135,18 +137,33 @@ function cellRectForIndex(index: number, boardRect: Rect, rows: number, cols: nu
   };
 }
 
-function createShuffledIndexes(length: number) {
+function createDerangedIndexes(length: number) {
   let result = Array.from({ length }, (_, index) => index);
+
+  if (length <= 1) {
+    return {
+      indexes: result,
+      valid: false
+    };
+  }
 
   for (let attempt = 0; attempt < puzzleConfig.shuffleAttempts; attempt += 1) {
     result = shuffle(result);
 
-    if (!isSolved(result)) {
-      return result;
+    if (isDerangement(result)) {
+      return {
+        indexes: result,
+        valid: true
+      };
     }
   }
 
-  return result.length > 1 ? [result[1], result[0], ...result.slice(2)] : result;
+  result = cyclicShift(length);
+
+  return {
+    indexes: result,
+    valid: isDerangement(result)
+  };
 }
 
 function shuffle(values: number[]) {
@@ -160,8 +177,12 @@ function shuffle(values: number[]) {
   return result;
 }
 
-function isSolved(indexes: number[]) {
-  return indexes.every((value, index) => value === index);
+function isDerangement(indexes: number[]) {
+  return indexes.every((value, index) => value !== index);
+}
+
+function cyclicShift(length: number) {
+  return Array.from({ length }, (_, index) => (index + 1) % length);
 }
 
 function clampRect(rect: Rect, canvasWidth: number, canvasHeight: number): Rect {

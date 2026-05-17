@@ -138,6 +138,10 @@ function formatPuzzleLines(
       text: `${puzzle.mode} | ${puzzle.difficulty.gridSize}x${puzzle.difficulty.gridSize} | locked ${locked}/${puzzle.pieces.length}`
     },
     {
+      text: `shuffle ${puzzle.shuffleValid ? "valid" : "invalid"} | fixed ${countFixedPieces(puzzle)}`,
+      kind: "muted"
+    },
+    {
       text: `drag ${interaction.dragPhase} | sel ${shortId(interaction.selectedPieceId)} | pinch ${activePinch}`,
       kind: "muted"
     },
@@ -146,6 +150,10 @@ function formatPuzzleLines(
       kind: "muted"
     }
   ];
+}
+
+function countFixedPieces(puzzle: PuzzleBoard) {
+  return puzzle.pieces.filter((piece) => piece.originalIndex === piece.currentIndex).length;
 }
 
 function ms(value: number | undefined) {
