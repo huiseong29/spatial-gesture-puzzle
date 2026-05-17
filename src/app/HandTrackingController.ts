@@ -85,7 +85,11 @@ export class HandTrackingController {
     this.starting = true;
     this.stopped = false;
     const startToken = ++this.startToken;
-    void this.soundManager.unlock();
+    void this.soundManager.unlock().then(() => {
+      if (this.isCurrentStart(startToken)) {
+        this.soundManager.startBgm();
+      }
+    });
     cancelAnimationFrame(this.animationFrameId);
     this.animationFrameId = 0;
     this.resetInteractionRuntime();
@@ -138,6 +142,7 @@ export class HandTrackingController {
     this.startToken += 1;
     this.stopped = true;
     this.starting = false;
+    this.soundManager.stopBgm();
     cancelAnimationFrame(this.animationFrameId);
     this.animationFrameId = 0;
     this.handLandmarker?.close();

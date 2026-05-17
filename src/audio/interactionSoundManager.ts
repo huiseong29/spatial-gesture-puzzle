@@ -23,6 +23,9 @@ type SoundPreset = {
 };
 
 const sfxVolume = 0.34;
+const bgmVolume = 0.09;
+const bgmPath = "/sounds/bgm_tomato_ambient_loop.wav";
+const bgmFadeOutMs = 450;
 
 const soundPresets: Record<SoundEvent, SoundPreset> = {
   "pinch-start": {
@@ -87,6 +90,10 @@ export class InteractionSoundManager {
   private muted = false;
   private unlocked = false;
   private readonly lastPlayedAt = new Map<SoundEvent, number>();
+  private bgmAudio: HTMLAudioElement | null = null;
+  private bgmLoadFailed = false;
+  private bgmFadeTimer = 0;
+  private bgmActive = false;
   private previousCaptureAt = 0;
   private previousSelectedPieceId: string | null = null;
   private previousSnapAt = 0;
@@ -97,6 +104,14 @@ export class InteractionSoundManager {
 
   setMuted(muted: boolean) {
     this.muted = muted;
+    if (muted) {
+      this.pauseBgm();
+      return;
+    }
+
+    if (this.unlocked && this.bgmActive) {
+      void this.playBgm();
+    }
   }
 
   isMuted() {
@@ -140,7 +155,55 @@ export class InteractionSoundManager {
     this.previousPuzzleTransitionPhase = "";
   }
 
+  startBgm() {
+    this.bgmActive = true;
+    if (this.unlocked && !this.muted) {
+      void this.playBgm();
+    }
+  }
+
+  stopBgm() {
+    this.bgmActive = false;
+    this.pauseBgm();
+  }
+
+  private pauseBgm() {
+    if (typeof window !== "undefined" && this.bgmFadeTimer) {
+      window.clearInterval(this.bgmFadeTimer);
+      this.bgmFadeTimer = 0;
+    }
+
+    if (!this.bgmAudio) {
+      return;
+    }
+
+    const audio = this.bgmAudio;
+    const startVolume = audio.volume;
+    const startTime = performance.now();
+
+    if (audio.paused || startVolume <= 0.001 || typeof window === "undefined") {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = bgmVolume;
+      return;
+    }
+
+    this.bgmFadeTimer = window.setInterval(() => {
+      const progress = Math.min(1, (performance.now() - startTime) / bgmFadeOutMs);
+      audio.volume = startVolume * (1 - progress);
+
+      if (progress >= 1) {
+        window.clearInterval(this.bgmFadeTimer);
+        this.bgmFadeTimer = 0;
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = bgmVolume;
+      }
+    }, 32);
+  }
+
   dispose() {
+    this.stopBgm();
     this.reset();
     this.lastPlayedAt.clear();
 
@@ -149,6 +212,8 @@ export class InteractionSoundManager {
     }
 
     this.audioContext = null;
+    this.bgmAudio = null;
+    this.bgmActive = false;
     this.unlocked = false;
   }
 
@@ -242,6 +307,55 @@ export class InteractionSoundManager {
     for (const note of preset.notes) {
       this.playNote(context, note, preset.volume);
     }
+  }
+
+  private async playBgm() {
+    if (this.muted || !this.unlocked || this.bgmLoadFailed) {
+      return;
+    }
+
+    const audio = this.getBgmAudio();
+    if (!audio || !audio.paused) {
+      return;
+    }
+
+    if (typeof window !== "undefined" && this.bgmFadeTimer) {
+      window.clearInterval(this.bgmFadeTimer);
+      this.bgmFadeTimer = 0;
+    }
+
+    audio.volume = bgmVolume;
+
+    try {
+      await audio.play();
+    } catch (error) {
+      this.bgmLoadFailed = true;
+      console.warn("[audio] BGM playback skipped:", error);
+    }
+  }
+
+  private getBgmAudio() {
+    if (typeof Audio === "undefined") {
+      return null;
+    }
+
+    if (!this.bgmAudio) {
+      const audio = new Audio(bgmPath);
+      audio.loop = true;
+      audio.preload = "auto";
+      audio.volume = bgmVolume;
+      audio.addEventListener(
+        "error",
+        () => {
+          this.bgmLoadFailed = true;
+          console.warn(`[audio] BGM file could not be loaded: ${bgmPath}`);
+        },
+        { once: true }
+      );
+      this.bgmAudio = audio;
+    }
+
+    return this.bgmAudio;
   }
 
   private playNote(
