@@ -244,7 +244,12 @@ export class HandTrackingController {
       const interactionStart = performance.now();
       const interactionHands = frame.hands.filter(isInteractionStableHand);
       frame.pinchGestures = this.pinchDetector.update(interactionHands, now);
-      const puzzleActive = Boolean(frame.puzzle?.mode === "ready" || frame.puzzle?.mode === "completed");
+      const puzzleActive = Boolean(
+        frame.puzzle?.mode === "loading" ||
+          frame.puzzle?.mode === "transitioning" ||
+          frame.puzzle?.mode === "ready" ||
+          frame.puzzle?.mode === "completed"
+      );
 
       if (!puzzleActive && !this.snapshotCaptureManager.isLocked(now)) {
         frame.virtualBoundingBox = this.virtualBoundingBoxTracker.update({

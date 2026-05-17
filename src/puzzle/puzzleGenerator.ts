@@ -236,7 +236,7 @@ function createInitialTransition(gridSize: number) {
   };
 }
 
-function calculateDifficulty(
+export function calculateDifficulty(
   snapshot: Snapshot,
   canvasWidth: number,
   canvasHeight: number,
@@ -244,14 +244,15 @@ function calculateDifficulty(
 ): DifficultyState {
   const captureAreaRatio = (snapshot.cropRectCanvas.width * snapshot.cropRectCanvas.height) /
     Math.max(canvasWidth * canvasHeight, 1);
-  let score = getCaptureAreaScore(captureAreaRatio);
+  const baseScore = getCaptureAreaScore(captureAreaRatio);
+  let score = baseScore;
   let reason: DifficultyState["reason"] =
-    score <= 2 ? "small-capture" : score >= 4 ? "large-capture" : "medium-capture";
+    baseScore <= 2 ? "small-capture" : baseScore >= 4 ? "large-capture" : "medium-capture";
 
   if (snapshot.trackingJitterPx >= puzzleConfig.highJitterPx || snapshot.gestureConfidence <= puzzleConfig.lowGestureConfidence) {
     score -= 1;
     reason = "low-stability";
-  } else if (snapshot.gestureConfidence >= puzzleConfig.highGestureConfidence) {
+  } else if (baseScore >= puzzleConfig.defaultGridSize && snapshot.gestureConfidence >= puzzleConfig.highGestureConfidence) {
     score += 0.5;
     reason = "high-confidence";
   }
@@ -260,7 +261,7 @@ function calculateDifficulty(
   const smoothedScore = previous
     ? previous.smoothedScore * puzzleConfig.difficultySmoothingAlpha + score * (1 - puzzleConfig.difficultySmoothingAlpha)
     : score;
-  const gridSize = Math.round(clamp(smoothedScore, puzzleConfig.minGridSize, puzzleConfig.maxGridSize));
+  const gridSize = resolveGridSize(score, smoothedScore, previous);
 
   return {
     gridSize,
@@ -283,4 +284,21 @@ function getCaptureAreaScore(areaRatio: number) {
   }
 
   return 3;
+}
+
+function resolveGridSize(score: number, smoothedScore: number, previous: DifficultyState | null) {
+  const clampedScore = clamp(score, puzzleConfig.minGridSize, puzzleConfig.maxGridSize);
+
+  if (!previous) {
+    return Math.round(clampedScore);
+  }
+
+  const previousGridSize = previous.gridSize;
+  const nextGridSize = Math.round(clampedScore);
+
+  if (nextGridSize !== previousGridSize) {
+    return nextGridSize;
+  }
+
+  return Math.round(clamp(smoothedScore, puzzleConfig.minGridSize, puzzleConfig.maxGridSize));
 }

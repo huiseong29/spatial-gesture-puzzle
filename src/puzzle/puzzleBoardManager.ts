@@ -2,8 +2,8 @@ import type { Snapshot } from "../capture/snapshotTypes";
 import { puzzleConfig } from "../config/puzzleConfig";
 import type { PinchGestureState } from "../interaction/gestures/pinchTypes";
 import type { TrackedHand } from "../tracking/handTypes";
-import { createPuzzleBoardFromSnapshot } from "./puzzleGenerator";
-import type { DifficultyState, PuzzleBoard } from "./puzzleTypes";
+import { calculateDifficulty, createPuzzleBoardFromSnapshot } from "./puzzleGenerator";
+import type { DifficultyState, PuzzleBoard, PuzzleInteractionState } from "./puzzleTypes";
 import { updatePuzzleInteraction } from "./puzzleInteraction";
 
 export class PuzzleBoardManager {
@@ -21,22 +21,19 @@ export class PuzzleBoardManager {
     pinchGestures: Map<string, PinchGestureState>
   ): PuzzleBoard | null {
     if (!snapshot) {
+      this.board = this.updateExistingBoard(this.board, hands, pinchGestures);
       return this.board;
     }
 
     this.latestSnapshot = snapshot;
 
     if (this.board?.snapshotId === snapshot.id || this.loadingSnapshotId === snapshot.id) {
-      this.board = this.updateTransition(this.board);
-      this.board = this.updateHeatmapReplay(this.board);
-
-      if (this.board?.mode === "ready") {
-        this.board = updatePuzzleInteraction(this.board, hands, pinchGestures);
-      }
+      this.board = this.updateExistingBoard(this.board, hands, pinchGestures);
       return this.board;
     }
 
     this.loadingSnapshotId = snapshot.id;
+    this.board = createLoadingBoard(snapshot, canvasWidth, canvasHeight, this.lastDifficulty);
     void createPuzzleBoardFromSnapshot(snapshot, canvasWidth, canvasHeight, this.lastDifficulty)
       .then((board) => {
         if (this.loadingSnapshotId === snapshot.id) {
@@ -51,57 +48,7 @@ export class PuzzleBoardManager {
         }
       });
 
-    const fallbackDifficulty = createFallbackDifficulty(snapshot, canvasWidth, canvasHeight, this.lastDifficulty);
-
-    return this.board ?? {
-      mode: "loading",
-      snapshotId: snapshot.id,
-      image: null,
-      rows: fallbackDifficulty.gridSize,
-      cols: fallbackDifficulty.gridSize,
-      boardRect: {
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0
-      },
-      pieces: [],
-      transition: null,
-      difficulty: fallbackDifficulty,
-      interaction: {
-        selectedPieceId: null,
-        activeHandId: null,
-        dragPhase: "idle",
-        pointer: null,
-        rawPointer: null,
-        smoothedPointer: null,
-        pointerVelocityPxPerSec: 0,
-        pointerSmoothingAlpha: 0,
-        pointerLagPx: 0,
-        grabWindowFrames: 0,
-        pointerLostFrames: 0,
-        releaseGraceFrames: 0,
-        dragOffset: {
-          x: 0,
-          y: 0
-        },
-        originCellIndex: null,
-        hoveredPieceId: null,
-        lastSnapPieceId: null,
-        lastSnapAt: 0,
-        snapPreview: null,
-        snapDistancePx: null,
-        nearestCellIndex: null,
-        completed: false,
-        completedAt: 0,
-        heatmapReplayMode: "hidden",
-        heatmapReplayStartedAt: 0,
-        pointerHistory: {
-          samples: [],
-          maxSamples: puzzleConfig.pointerHistoryMaxSamples
-        }
-      }
-    };
+    return this.board;
   }
 
   reset() {
@@ -212,25 +159,81 @@ export class PuzzleBoardManager {
       }
     };
   }
+
+  private updateExistingBoard(
+    board: PuzzleBoard | null,
+    hands: TrackedHand[],
+    pinchGestures: Map<string, PinchGestureState>
+  ) {
+    let nextBoard = this.updateTransition(board);
+    nextBoard = this.updateHeatmapReplay(nextBoard);
+
+    if (nextBoard?.mode === "ready") {
+      nextBoard = updatePuzzleInteraction(nextBoard, hands, pinchGestures);
+    }
+
+    return nextBoard;
+  }
 }
 
-function createFallbackDifficulty(
+function createLoadingBoard(
   snapshot: Snapshot,
   canvasWidth: number,
   canvasHeight: number,
   previous: DifficultyState | null
-): DifficultyState {
-  const captureAreaRatio = (snapshot.cropRectCanvas.width * snapshot.cropRectCanvas.height) /
-    Math.max(canvasWidth * canvasHeight, 1);
-  const score = previous?.smoothedScore ?? 3;
-
+): PuzzleBoard {
+  const difficulty = calculateDifficulty(snapshot, canvasWidth, canvasHeight, previous);
   return {
-    gridSize: Math.round(score),
-    score,
-    smoothedScore: score,
-    captureAreaRatio,
-    gestureConfidence: snapshot.gestureConfidence,
-    trackingJitterPx: snapshot.trackingJitterPx,
-    reason: "medium-capture"
+    mode: "loading",
+    snapshotId: snapshot.id,
+    image: null,
+    rows: difficulty.gridSize,
+    cols: difficulty.gridSize,
+    boardRect: {
+      x: snapshot.cropRectCanvas.x,
+      y: snapshot.cropRectCanvas.y,
+      width: snapshot.cropRectCanvas.width,
+      height: snapshot.cropRectCanvas.height
+    },
+    pieces: [],
+    transition: null,
+    difficulty,
+    interaction: createInitialInteraction()
+  };
+}
+
+function createInitialInteraction(): PuzzleInteractionState {
+  return {
+    selectedPieceId: null,
+    activeHandId: null,
+    dragPhase: "idle",
+    pointer: null,
+    rawPointer: null,
+    smoothedPointer: null,
+    pointerVelocityPxPerSec: 0,
+    pointerSmoothingAlpha: 0,
+    pointerLagPx: 0,
+    grabWindowFrames: 0,
+    pointerLostFrames: 0,
+    releaseGraceFrames: 0,
+    dragOffset: {
+      x: 0,
+      y: 0
+    },
+    originCellIndex: null,
+    hoveredPieceId: null,
+    lastSnapPieceId: null,
+    lastSnapAt: 0,
+    snapPreview: null,
+    snapDistancePx: null,
+    nearestCellIndex: null,
+    completed: false,
+    completedAt: 0,
+    heatmapReplayMode: "hidden",
+    heatmapReplayStartedAt: 0,
+    pointerHistory: {
+      samples: [],
+      maxSamples: puzzleConfig.pointerHistoryMaxSamples
+    }
   };
 }
